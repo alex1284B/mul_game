@@ -1,0 +1,897 @@
+<!DOCTYPE html>
+<html lang="sr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title data-i18n="title">Математичко Авантура v2.2</title>
+    <style>
+        :root {
+            --bg: #f0f4f8; --board-bg: #e2e8f0; --cell-bg: #ffffff;
+            --island-0: #ffeaa7; --island-1: #fab1a0; --island-2: #ff7675;
+            --island-3: #fd79a8; --island-4: #a29bfe; --island-5: #6c5ce7;
+            --island-6: #00b894; --island-7: #00cec9; --island-8: #0984e3; --island-9: #e84393;
+            --accent: #2d3436; --text: #2d3436; --success: #00b894; --error: #d63031;
+            --shadow: 0 4px 12px rgba(0,0,0,0.1);
+        }
+        * { box-sizing: border-box; font-family: 'Segoe UI', system-ui, sans-serif; }
+        body { margin: 0; background: var(--bg); color: var(--text); display: flex; justify-content: center; align-items: center; min-height: 100vh; padding: 10px; }
+
+        /* SETUP */
+        #setup-screen { background: white; padding: 30px; border-radius: 16px; box-shadow: var(--shadow); max-width: 500px; width: 100%; text-align: center; }
+        #setup-screen h1 { margin: 0 0 20px; }
+        .input-group { margin-bottom: 15px; text-align: left; }
+        .input-group label { display: block; margin-bottom: 5px; font-weight: bold; }
+        .input-group input, .input-group select, .input-group .difficulty-wrapper { width: 100%; padding: 10px; border: 2px solid #ddd; border-radius: 8px; font-size: 16px; }
+        .difficulty-wrapper { padding: 0; border: none; }
+        .difficulty-wrapper label { margin-bottom: 8px; }
+        .difficulty-slider-container { display: flex; flex-direction: column; gap: 8px; }
+        .difficulty-slider-container input[type="range"] { width: 100%; cursor: pointer; }
+        .difficulty-label { font-weight: bold; color: var(--accent); text-align: center; font-size: 14px; min-height: 20px; }
+        button.primary { background: var(--accent); color: white; border: none; padding: 12px 24px; border-radius: 8px; font-size: 18px; cursor: pointer; width: 100%; transition: 0.2s; }
+        button.primary:hover { transform: translateY(-2px); }
+
+        /* LANGUAGE SWITCHER HIDDEN DURING GAME */
+        .lang-switch.hidden { display: none !important; }
+
+        /* LANGUAGE SWITCHER */
+        .lang-switch { position: fixed; top: 15px; right: 15px; z-index: 200; }
+        #lang-select { padding: 8px 12px; border-radius: 8px; border: 2px solid #ddd; font-size: 14px; cursor: pointer; background: white; }
+
+        /* GAME */
+        #game-screen { display: none; width: 100%; max-width: 1200px; gap: 20px; flex-wrap: wrap; justify-content: center; }
+
+        #board-container { position: relative; background: var(--board-bg); padding: 10px; border-radius: 12px; box-shadow: var(--shadow); }
+        #board { display: grid; grid-template-columns: repeat(10, 1fr); grid-template-rows: repeat(10, 1fr); width: min(80vw, 600px); height: min(80vw, 600px); gap: 2px; }
+        #board.dynamic-grid { grid-template-columns: repeat(auto-fill, minmax(min(8vw, 60px), 1fr)); }
+        .cell { background: var(--cell-bg); border-radius: 6px; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 13px; position: relative; overflow: hidden; }
+        .cell.finish { background: linear-gradient(135deg, #f1c40f, #f39c12); border: 2px dashed #fff; color: #000; }
+        .island-bg { position: absolute; inset: 0; pointer-events: none; border-radius: 6px; opacity: 0.6; z-index: 0; }
+        .cell span.num { z-index: 1; font-size: 11px; }
+        .cell-icon { position: absolute; top: 3px; right: 3px; font-size: 12px; z-index: 2; filter: drop-shadow(0 1px 2px rgba(0,0,0,0.2)); }
+
+        .token { position: absolute; width: 28px; height: 28px; border-radius: 50%; border: 3px solid white; box-shadow: 0 2px 8px rgba(0,0,0,0.3); transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1); z-index: 10; display: flex; align-items: center; justify-content: center; color: white; font-weight: bold; font-size: 12px; }
+        .token.active { box-shadow: 0 0 0 4px rgba(0,0,0,0.2), 0 2px 8px rgba(0,0,0,0.3); transform: scale(1.1); z-index: 11; }
+        .token.p0 { background: #e17055; } .token.p1 { background: #0984e3; }
+        .token.p2 { background: #00b894; } .token.p3 { background: #6c5ce7; }
+
+        #ui-panel { background: white; padding: 20px; border-radius: 12px; box-shadow: var(--shadow); flex: 1; min-width: 320px; max-width: 420px; display: flex; flex-direction: column; gap: 15px; }
+        #turn-info { display: flex; justify-content: space-between; align-items: center; padding: 10px; background: #f8f9fa; border-radius: 8px; }
+        #player-badge { padding: 5px 10px; border-radius: 6px; color: white; font-weight: bold; }
+
+        #dice-btn { width: 80px; height: 80px; background: white; border: 3px solid #ddd; border-radius: 12px; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 40px; margin: 0 auto; transition: 0.2s; box-shadow: var(--shadow); }
+        #dice-btn:hover:not(:disabled) { transform: scale(1.05); background: #f1f2f6; }
+        #dice-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+        #dice-btn.rolling { animation: shake 0.5s infinite; }
+        @keyframes shake { 0%,100%{transform:rotate(0deg)} 25%{transform:rotate(-15deg)} 75%{transform:rotate(15deg)} }
+
+        #problem-box { text-align: center; font-size: 26px; font-weight: bold; padding: 12px; background: #f1f2f6; border-radius: 8px; min-height: 55px; display: flex; align-items: center; justify-content: center; transition: background 0.3s; }
+        #problem-box.correct { background: var(--success); color: white; }
+        #problem-box.wrong { background: var(--error); color: white; }
+
+        #keypad { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+        .kp-btn { padding: 12px; font-size: 20px; border: none; border-radius: 8px; background: #dfe6e9; cursor: pointer; transition: 0.1s; }
+        .kp-btn:hover { background: #b2bec3; }
+        .kp-btn.enter { background: var(--success); color: white; grid-column: span 2; }
+        .kp-btn.clear { background: var(--error); color: white; }
+        .kp-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+        #timer-bar { height: 8px; background: #dfe6e9; border-radius: 4px; overflow: hidden; }
+        #timer-fill { height: 100%; width: 100%; background: var(--accent); transition: width 1s linear; }
+
+        #history { height: 180px; overflow-y: auto; background: #f8f9fa; padding: 10px; border-radius: 8px; font-size: 13px; line-height: 1.5; border: 1px solid #eee; scroll-behavior: smooth; }
+        .log-entry { padding: 4px 6px; margin-bottom: 4px; border-radius: 4px; border-left: 4px solid transparent; background: #fff; box-shadow: 0 1px 2px rgba(0,0,0,0.05); }
+        .log-entry.wrong { border-left-color: var(--error); background: #ffeaea; color: var(--error); font-weight: 600; }
+        .log-entry.bonus { border-left-color: #f39c12; background: #fff9e6; }
+        .log-entry.system { border-left-color: #95a5a6; font-style: italic; color: #666; }
+
+        .hidden { display: none !important; }
+        #win-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.8); display: flex; align-items: center; justify-content: center; z-index: 100; backdrop-filter: blur(5px); }
+        #win-box { background: white; padding: 40px; border-radius: 16px; text-align: center; animation: pop 0.3s ease-out; box-shadow: var(--shadow); }
+        @keyframes pop { from { transform: scale(0.8); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+
+        /* TURN POPUP */
+        #turn-popup { position: fixed; top: 0; left: 0; right: 0; bottom: 0; display: flex; align-items: center; justify-content: center; z-index: 300; pointer-events: none; opacity: 0; transition: opacity 0.3s ease; }
+        #turn-popup.visible { opacity: 1; }
+        #turn-popup-bg { position: absolute; inset: 0; background: rgba(0,0,0,0.55); backdrop-filter: blur(3px); }
+        #turn-popup-box { position: relative; background: white; padding: 24px 40px; border-radius: 16px; text-align: center; box-shadow: 0 8px 32px rgba(0,0,0,0.3); animation: pop 0.3s ease-out; max-width: 90vw; }
+        #turn-popup-box .popup-icon { font-size: 48px; margin-bottom: 8px; }
+        #turn-popup-box .popup-text { font-size: 22px; font-weight: bold; color: var(--text); }
+        #turn-popup-box .popup-sub { font-size: 15px; color: #666; margin-top: 4px; }
+    </style>
+</head>
+<body>
+
+<!-- Language Switcher -->
+<div class="lang-switch">
+    <select id="lang-select" onchange="changeLanguage(this.value)">
+        <option value="sr">SR</option>
+        <option value="en">EN</option>
+        <option value="ru">RU</option>
+    </select>
+</div>
+
+<div id="setup-screen">
+    <h1 data-i18n="game_title">🌊 Математичко Авантура</h1>
+    <div class="input-group">
+        <label data-i18n="players_label">Број играча (2-4)</label>
+        <select id="num-players">
+            <option value="2" data-i18n="players_2">2 играча</option>
+            <option value="3" data-i18n="players_3">3 играча</option>
+            <option value="4" data-i18n="players_4">4 играча</option>
+        </select>
+    </div>
+    <div class="input-group difficulty-wrapper">
+        <div class="difficulty-slider-container">
+            <label data-i18n="difficulty_label">Ниво сложености</label>
+            <input type="range" id="difficulty" min="1" max="10" value="10" oninput="updateDifficultyLabel()">
+            <div class="difficulty-label" id="difficulty-label" data-i18n="difficulty_hint_10">×10 (100 поља)</div>
+        </div>
+    </div>
+    <div class="input-group">
+        <label style="display:flex; align-items:center; gap:10px; cursor:pointer;">
+            <input type="checkbox" id="hardcore-toggle" style="width:20px; height:20px; accent-color:var(--error); cursor:pointer;">
+            <span data-i18n="hardcore_label">🔥 Hardcore режим</span>
+        </label>
+    </div>
+    <div class="input-group">
+        <label data-i18n="time_label">Време на одговор (секунди)</label>
+        <input type="number" id="time-limit" value="15" min="5" max="30">
+    </div>
+    <button class="primary" onclick="startGame()" data-i18n="start_button">🚀 Започни игру</button>
+
+    <div style="margin-top: 20px; text-align: left;">
+        <h3 data-i18n="rating_title">📊 Рекорди</h3>
+        <div id="rating-table" style="max-height: 150px; overflow-y: auto; background: #f8f9fa; padding: 10px; border-radius: 8px; font-size: 13px;">
+            <div class="no-rating-text" data-i18n="no_ratings">Нема сачуваних рекорда</div>
+        </div>
+    </div>
+</div>
+
+<div id="game-screen">
+    <div id="board-container">
+        <div id="board"></div>
+        <div id="tokens-container"></div>
+    </div>
+
+    <div id="ui-panel">
+        <div id="turn-info">
+            <div><span id="turn-prefix" data-i18n="turn_prefix">На реду:</span> <span id="player-name">Играч 1</span></div>
+            <div id="player-badge">P1</div>
+        </div>
+        <div id="hardcore-badge" class="hidden" style="text-align:center; background: linear-gradient(135deg, #e17055, #d63031); color: white; padding: 6px 12px; border-radius: 8px; font-weight: bold; font-size: 14px; letter-spacing: 0.5px;">🔥 HARDCORE</div>
+
+        <button id="dice-btn" onclick="rollDice()" data-i18n="dice_button">🎲</button>
+        <div id="problem-box" data-i18n="dice_roll">Баци коцку...</div>
+        <div id="timer-bar"><div id="timer-fill"></div></div>
+
+        <div id="keypad" class="hidden">
+            <button class="kp-btn" onclick="typeNum(1)">1</button>
+            <button class="kp-btn" onclick="typeNum(2)">2</button>
+            <button class="kp-btn" onclick="typeNum(3)">3</button>
+            <button class="kp-btn" onclick="typeNum(4)">4</button>
+            <button class="kp-btn" onclick="typeNum(5)">5</button>
+            <button class="kp-btn" onclick="typeNum(6)">6</button>
+            <button class="kp-btn" onclick="typeNum(7)">7</button>
+            <button class="kp-btn" onclick="typeNum(8)">8</button>
+            <button class="kp-btn" onclick="typeNum(9)">9</button>
+            <button class="kp-btn clear" onclick="clearInput()" data-i18n="clear_btn">⌫</button>
+            <button class="kp-btn" onclick="typeNum(0)">0</button>
+            <button class="kp-btn enter" onclick="submitAnswer()" data-i18n="submit_answer">✓ Одговор</button>
+        </div>
+
+        <div id="history">
+            <div class="no-history-text" data-i18n="no_history">Историја потеза ће се појавити овде...</div>
+        </div>
+    </div>
+</div>
+
+<div id="win-overlay" class="hidden">
+    <div id="win-box">
+        <h1 data-i18n="win_title">🏆 Победа!</h1>
+        <h2 id="winner-name"></h2>
+        <p data-i18n="win_message">Честитамо! Сва острва су покорана!</p>
+        <button class="primary" onclick="restartGame()" data-i18n="restart_button">🔄 Играти поново</button>
+    </div>
+</div>
+
+<div id="turn-popup">
+    <div id="turn-popup-bg"></div>
+    <div id="turn-popup-box">
+        <div class="popup-icon" id="popup-icon">🎮</div>
+        <div class="popup-text" id="popup-text"></div>
+        <div class="popup-sub" id="popup-sub"></div>
+    </div>
+</div>
+
+<script>
+    // === TRANSLATIONS (SR/EN/RU) ===
+    const translations = {
+        sr: {
+            title: "Математичко Авантура v2.2",
+            game_title: "🌊 Математичко Авантура",
+            players_label: "Број играча (2-4)",
+            players_2: "2 играча",
+            players_3: "3 играча",
+            players_4: "4 играча",
+            difficulty_label: "Ниво сложености",
+            time_label: "Време на одговор (секунди)",
+            start_button: "🚀 Започни игру",
+            rating_title: "📊 Рекорди",
+            no_ratings: "Нема сачуваних рекорда",
+            placman: "Пласман",
+            player: "Играч",
+            time: "Време",
+            players: "Играчи",
+            difficulty_hint_1: "×1 (10 поља)",
+            difficulty_hint_2: "×2 (20 поља)",
+            difficulty_hint_3: "×3 (30 поља)",
+            difficulty_hint_4: "×4 (40 поља)",
+            difficulty_hint_5: "×5 (50 поља)",
+            difficulty_hint_6: "×6 (60 поља)",
+            difficulty_hint_7: "×7 (70 поља)",
+            difficulty_hint_8: "×8 (80 поља)",
+            difficulty_hint_9: "×9 (90 поља)",
+            difficulty_hint_10: "×10 (100 поља)",
+            turn_label: "На реду:",
+            dice_button: "🎲",
+            dice_roll: "Баци коцку...",
+            clear_btn: "⌫",
+            submit_answer: "✓ Одговор",
+            no_history: "Историја потеза ће се појавити овде...",
+            win_title: "🏆 Победа!",
+            win_message: "Честитамо! Сва острва су покорана!",
+            restart_button: "🔄 Играти поново",
+            turn_prefix: "На реду:",
+            dice_prefix: "🎲",
+            coordinate_prefix: "Координата",
+            correct: "✅ Тачно!",
+            time_out: "⏱️ Време!",
+            correct_answer_prefix: "Тачно:",
+            no_player_text: "Играч",
+            no_history_game_start: "Историја потеза ће се појавити овде...",
+            game_started: "Игра је почела! Срећно!",
+            bonus_extra_turn: "добија додатни ход",
+            skip_turn: "пропуска ход",
+            time_total: "Твој укупни време:",
+            time_seconds: "сек.",
+            winner_name_placeholder: "Унеси своје име",
+            save_rating: "💾 Сачувај рекорд",
+            anonymous: "Анонимни",
+            total_time: "Твој укупни време:",
+            islands_conquered: "Сва острва су покорана!",
+            all_players: "Сви играчи",
+            bonus_token: "добија додатни ход",
+            skip_token: "пропуска ход",
+            good_luck: "Срећно",
+            moves: "Ходова",
+            difficulty: "Сложеност",
+            hardcore_label: "🔥 Hardcore режим"
+        },
+        en: {
+            title: "Math Adventure v2.2",
+            game_title: "🌊 Math Adventure",
+            players_label: "Number of players (2-4)",
+            players_2: "2 players",
+            players_3: "3 players",
+            players_4: "4 players",
+            difficulty_label: "Difficulty level",
+            time_label: "Answer time (seconds)",
+            start_button: "🚀 Start Game",
+            rating_title: "📊 Ratings",
+            no_ratings: "No saved records",
+            placman: "Placement",
+            player: "Player",
+            time: "Time",
+            players: "Players",
+            difficulty_hint_1: "×1 (10 fields)",
+            difficulty_hint_2: "×2 (20 fields)",
+            difficulty_hint_3: "×3 (30 fields)",
+            difficulty_hint_4: "×4 (40 fields)",
+            difficulty_hint_5: "×5 (50 fields)",
+            difficulty_hint_6: "×6 (60 fields)",
+            difficulty_hint_7: "×7 (70 fields)",
+            difficulty_hint_8: "×8 (80 fields)",
+            difficulty_hint_9: "×9 (90 fields)",
+            difficulty_hint_10: "×10 (100 fields)",
+            turn_label: "Turn:",
+            dice_button: "🎲",
+            dice_roll: "Roll the dice...",
+            clear_btn: "⌫",
+            submit_answer: "✓ Answer",
+            no_history: "Move history will appear here...",
+            win_title: "🏆 Victory!",
+            win_message: "Congratulations! All islands are conquered!",
+            restart_button: "🔄 Play Again",
+            turn_prefix: "Turn:",
+            dice_prefix: "🎲",
+            coordinate_prefix: "Coordinate",
+            correct: "✅ Correct!",
+            time_out: "⏱️ Time!",
+            correct_answer_prefix: "Correct:",
+            no_player_text: "Player",
+            no_history_game_start: "Move history will appear here...",
+            game_started: "Game started! Good luck!",
+            bonus_extra_turn: "gets an extra turn",
+            skip_turn: "skips turn",
+            time_total: "Your total time:",
+            time_seconds: "sec.",
+            winner_name_placeholder: "Enter your name",
+            save_rating: "💾 Save Record",
+            anonymous: "Anonymous",
+            total_time: "Your total time:",
+            islands_conquered: "All islands are conquered!",
+            all_players: "All players",
+            bonus_token: "gets an extra turn",
+            skip_token: "skips turn",
+            good_luck: "Good luck",
+            moves: "moves",
+            difficulty: "Difficulty",
+            hardcore_label: "🔥 Hardcore mode"
+        },
+        ru: {
+            title: "Математическое Приключение v2.2",
+            game_title: "🌊 Математическое Приключение",
+            players_label: "Количество игроков (2-4)",
+            players_2: "2 игрока",
+            players_3: "3 игрока",
+            players_4: "4 игрока",
+            difficulty_label: "Уровень сложности",
+            time_label: "Время на ответ (секунды)",
+            start_button: "🚀 Начать игру",
+            rating_title: "📊 Рекорды",
+            no_ratings: "Нет сохраненных записей",
+            placman: "Место",
+            player: "Игрок",
+            time: "Время",
+            players: "Игроки",
+            difficulty_hint_1: "×1 (10 полей)",
+            difficulty_hint_2: "×2 (20 полей)",
+            difficulty_hint_3: "×3 (30 полей)",
+            difficulty_hint_4: "×4 (40 полей)",
+            difficulty_hint_5: "×5 (50 полей)",
+            difficulty_hint_6: "×6 (60 полей)",
+            difficulty_hint_7: "×7 (70 полей)",
+            difficulty_hint_8: "×8 (80 полей)",
+            difficulty_hint_9: "×9 (90 полей)",
+            difficulty_hint_10: "×10 (100 полей)",
+            turn_label: "Ход:",
+            dice_button: "🎲",
+            dice_roll: "Бросок...",
+            clear_btn: "⌫",
+            submit_answer: "✓ Ответ",
+            no_history: "История ходовов появится здесь...",
+            win_title: "🏆 Победа!",
+            win_message: "Поздравляем! Все острова покорены!",
+            restart_button: "🔄 Играть снова",
+            turn_prefix: "Ход:",
+            dice_prefix: "🎲",
+            coordinate_prefix: "Координата",
+            correct: "✅ Верно!",
+            time_out: "⏱️ Время!",
+            correct_answer_prefix: "Верно:",
+            no_player_text: "Игрок",
+            no_history_game_start: "История ходовов появится здесь...",
+            game_started: "Игра началась! Удачи!",
+            bonus_extra_turn: "получает дополнительный ход",
+            skip_turn: "пропускает ход",
+            time_total: "Ваше общее время:",
+            time_seconds: "сек.",
+            winner_name_placeholder: "Введите ваше имя",
+            save_rating: "💾 Сохранить рекорд",
+            anonymous: "Анонимный",
+            total_time: "Ваше общее время:",
+            islands_conquered: "Все острова покорены!",
+            all_players: "Все игроки",
+            bonus_token: "получает дополнительный ход",
+            skip_token: "пропускает ход",
+            good_luck: "Удачи",
+            moves: "ходов",
+            difficulty: "Сложность",
+            hardcore_label: "🔥 Hardcore режим"
+        }
+    };
+
+    // === LANGUAGE MANAGEMENT ===
+    const SUPPORTED_LANGS = ['sr', 'en', 'ru'];
+
+    function getBrowserLang() {
+        const langs = navigator.languages && navigator.languages.length ? navigator.languages : [navigator.language];
+        for (const locale of langs) {
+            if (!locale) continue;
+            const code = locale.toLowerCase();
+            if (code.startsWith('sr')) return 'sr';
+            if (code.startsWith('en')) return 'en';
+            if (code.startsWith('ru')) return 'ru';
+        }
+        return 'sr';
+    }
+
+    function getCurrentLang() {
+        return localStorage.getItem('game_lang') || getBrowserLang();
+    }
+
+    function updateDifficultyLabel() {
+        const diff = document.getElementById('difficulty').value;
+        document.getElementById('difficulty-label').textContent = t('difficulty_hint_' + diff);
+    }
+
+    function changeLanguage(lang) {
+        if (!SUPPORTED_LANGS.includes(lang)) lang = 'sr';
+        localStorage.setItem('game_lang', lang);
+        document.documentElement.lang = lang;
+
+        // Re-read current game state to update player names if game is running
+        if (state.players.length > 0) {
+            const currentLang = getCurrentLang();
+            state.players = state.players.map((_, i) => NAMES[currentLang][i]);
+        }
+
+        translatePage();
+        renderRating(); // Re-render rating with new language
+    }
+
+    function t(key) {
+        const lang = getCurrentLang();
+        const dict = translations[lang] || translations['sr'];
+        return dict[key] || translations['sr'][key] || key;
+    }
+
+    function translatePage() {
+        // Translate static text elements
+        document.querySelectorAll('[data-i18n]').forEach(el => {
+            const key = el.getAttribute('data-i18n');
+            el.textContent = t(key);
+        });
+
+        // Update title
+        document.title = t('title');
+
+        // Update select options
+        document.getElementById('num-players').innerHTML = `
+            <option value="2">${t('players_2')}</option>
+            <option value="3">${t('players_3')}</option>
+            <option value="4">${t('players_4')}</option>
+        `;
+    }
+
+    // === STATE ===
+    const state = {
+        players: [], currentPlayer: 0, positions: [], skipNext: [], extraTurn: [],
+        timerDuration: 15, timerLeft: 0, timerInterval: null,
+        currentProblem: null, inputBuffer: "", isRolling: false, isAnswering: false, diceResult: 0,
+        playerTime: [], totalStartTime: 0, playerTurns: [], difficulty: 3, boardSize: 30,
+        hardcore: false
+    };
+
+    // RATING TABLE
+    const RATING_KEY = 'math_game_rating_v2';
+    function loadRating() {
+        try { return JSON.parse(localStorage.getItem(RATING_KEY)) || []; }
+        catch(e) { return []; }
+    }
+    function saveRating(rating) {
+        localStorage.setItem(RATING_KEY, JSON.stringify(rating));
+    }
+    function addRatingEntry(name, time, players) {
+        const rating = loadRating();
+        rating.push({ name, time, players, difficulty: state.difficulty, turns: state.playerTurns, hardcore: state.hardcore, date: new Date().toISOString() });
+        rating.sort((a, b) => a.time - b.time);
+        if (rating.length > 50) rating.length = 50;
+        saveRating(rating);
+    }
+
+    const COLORS = ['#e17055', '#0984e3', '#00b894', '#6c5ce7'];
+    const NAMES_SR = ['🦁 Играч 1', '🐯 Играч 2', '🦊 Играч 3', '🐼 Играч 4'];
+    const NAMES_EN = ['🦁 Player 1', '🐯 Player 2', '🦊 Player 3', '🐼 Player 4'];
+    const NAMES_RU = ['🦁 Игрок 1', '🐯 Игрок 2', '🦊 Игрок 3', '🐼 Игрок 4'];
+    const NAMES = {
+        sr: NAMES_SR,
+        en: NAMES_EN,
+        ru: NAMES_RU
+    };
+    const ISLAND_COLORS = ['var(--island-0)', 'var(--island-1)', 'var(--island-2)', 'var(--island-3)', 'var(--island-4)', 'var(--island-5)', 'var(--island-6)', 'var(--island-7)', 'var(--island-8)', 'var(--island-9)'];
+
+    function rand(min, max) { return Math.floor(Math.random() * (max - min + 1)) + min; }
+
+    function startGame() {
+        renderRating();
+        const num = parseInt(document.getElementById('num-players').value);
+        const currentLang = getCurrentLang();
+        state.difficulty = parseInt(document.getElementById('difficulty').value);
+        state.boardSize = state.difficulty * 10; // Dynamic board size
+        state.timerDuration = parseInt(document.getElementById('time-limit').value) || 15;
+        state.hardcore = document.getElementById('hardcore-toggle').checked;
+        state.players = Array.from({length: num}, (_, i) => NAMES[currentLang][i]);
+        state.positions = new Array(num).fill(0);
+        state.skipNext = new Array(num).fill(false);
+        state.extraTurn = new Array(num).fill(false);
+        state.playerTime = new Array(num).fill(0);
+        state.playerTurns = new Array(num).fill(0);
+        state.totalStartTime = Date.now();
+        state.currentPlayer = 0;
+
+        // Disable language switcher during game
+        document.querySelector('.lang-switch').classList.add('hidden');
+
+        document.getElementById('setup-screen').style.display = 'none';
+        document.getElementById('game-screen').style.display = 'flex';
+        buildBoard(); createTokens(); updateUI();
+        logSystem(`${t('game_started')}! ${t('good_luck')}`);
+        showTurnPopup('🚀', `${state.players[0]}`, t('game_started'));
+    }
+
+    function buildBoard() {
+        const board = document.getElementById('board');
+        board.innerHTML = '';
+        // Dynamic board size based on difficulty: 10 fields per level
+        const totalCells = state.boardSize;
+        // Calculate grid dimensions: rows = ceil(size/10)
+        const rows = Math.ceil(totalCells / 10);
+        const cols = 10;
+
+        // Set grid dynamically for non-standard sizes
+        if (rows !== 10) {
+            board.style.gridTemplateColumns = `repeat(${cols}, 1fr)`;
+            board.style.gridTemplateRows = `repeat(${rows}, 1fr)`;
+            board.classList.add('dynamic-grid');
+        } else {
+            board.style.gridTemplateColumns = `repeat(${cols}, 1fr)`;
+            board.style.gridTemplateRows = `repeat(${rows}, 1fr)`;
+            board.classList.remove('dynamic-grid');
+        }
+
+        for (let i = 0; i <= totalCells; i++) {
+            const cell = document.createElement('div');
+            cell.className = 'cell'; cell.id = `cell-${i}`;
+            const row = Math.floor(i / cols);
+            const isReversed = row % 2 !== 0;
+            const col = isReversed ? cols - 1 - (i % cols) : (i % cols);
+            cell.style.gridRow = rows - row; cell.style.gridColumn = col + 1;
+
+            let content = `<span class="num">${i}</span>`;
+            let islandIdx = -1;
+            if (i > 0 && i < totalCells) {
+                islandIdx = Math.min(Math.floor((i - 1) / 10), 9);
+                const offset = i % 10;
+                if (offset === 3) content += `<span class="cell-icon">🦜</span>`;
+                if (offset === 7) content += `<span class="cell-icon">🎁</span>`;
+            }
+            if (i === totalCells) cell.classList.add('finish');
+            cell.innerHTML = content;
+            if (islandIdx >= 0) {
+                const bg = document.createElement('div'); bg.className = 'island-bg'; bg.style.background = ISLAND_COLORS[islandIdx]; cell.appendChild(bg);
+            }
+            board.appendChild(cell);
+        }
+    }
+
+    function createTokens() {
+        const container = document.getElementById('tokens-container'); container.innerHTML = '';
+        state.players.forEach((_, i) => {
+            const t = document.createElement('div'); t.className = `token p${i}`; t.id = `token-${i}`; t.textContent = i + 1;
+            container.appendChild(t); moveTokenTo(i, 0);
+        });
+    }
+
+    function moveTokenTo(playerIdx, targetPos) {
+        state.positions[playerIdx] = targetPos;
+        const token = document.getElementById(`token-${playerIdx}`);
+        const cell = document.getElementById(`cell-${Math.min(targetPos, state.boardSize)}`);
+        if (cell) {
+            const rect = cell.getBoundingClientRect(); const boardRect = document.getElementById('board-container').getBoundingClientRect();
+            token.style.top = (rect.top - boardRect.top + rect.height / 2 - 14) + 'px';
+            token.style.left = (rect.left - boardRect.left + rect.width / 2 - 14) + 'px';
+        }
+    }
+
+    function rollDice() {
+        if (state.isRolling || state.isAnswering) return;
+
+        state.isRolling = true; const btn = document.getElementById('dice-btn');
+        btn.classList.add('rolling'); btn.disabled = true;
+        document.getElementById('problem-box').textContent = t('dice_roll');
+        document.getElementById('problem-box').className = '';
+
+        setTimeout(() => {
+            state.diceResult = Math.floor(Math.random() * 6) + 1;
+            btn.textContent = state.diceResult; btn.classList.remove('rolling'); state.isRolling = false;
+            const target = Math.min(state.positions[state.currentPlayer] + state.diceResult, state.boardSize);
+            document.getElementById('problem-box').textContent = `${t('dice_prefix')} ${state.diceResult} ➜ ${t('coordinate_prefix')} ${target}`;
+            setTimeout(startAnswerPhase, 600);
+        }, 600);
+    }
+
+    function getIslandLevel(cell) {
+        if (cell <= 10) return 0; if (cell <= 20) return 1; if (cell <= 30) return 2;
+        if (cell <= 40) return 3; if (cell <= 50) return 4; if (cell <= 60) return 5;
+        if (cell <= 70) return 6; if (cell <= 80) return 7; if (cell <= 90) return 8;
+        return 9;
+    }
+
+    // Dynamic level calculation based on board size
+    function getIslandLevelDynamic(cell) {
+        const levelSize = 10;
+        const maxLevel = state.difficulty;
+        const maxCell = state.boardSize;
+
+        if (cell <= 0) return 0;
+        if (cell >= maxCell) return Math.min(maxLevel, 9); // Finish
+        return Math.min(Math.floor((cell - 1) / levelSize), maxLevel - 1);
+    }
+
+    // 🔧 ИСПРАВЛЕННЫЙ БЛОК ГЕНЕРАЦИИ
+    function generateProblem(cell) {
+        const level = getIslandLevelDynamic(cell);
+        let a, b;
+        switch(level) {
+            case 0: { // ×0, ×1, ×10 → ×10, ×11, ×20 in hardcore
+                const t = Math.random();
+                const num = rand(1, 9);
+                if (t < 0.33) {
+                    if (state.hardcore) return {q: `${num} × 10 = ?`, ans: num * 10};
+                    return {q: `${num} × 0 = ?`, ans: 0};
+                }
+                if (t < 0.66) {
+                    if (state.hardcore) return {q: `${num} × 11 = ?`, ans: num * 11};
+                    return {q: `${num} × 1 = ?`, ans: num};
+                }
+                if (state.hardcore) return {q: `${num} × 20 = ?`, ans: num * 20};
+                return {q: `${num} × 10 = ?`, ans: num * 10};
+            }
+            case 1: a = 2; b = rand(2, 9); break;
+            case 2: a = 3; b = rand(3, 9); break;
+            case 3: a = Math.random() > 0.5 ? 4 : 5; b = rand(3, 9); break;
+            case 4: a = 6; b = rand(4, 9); break;
+            case 5: a = 7; b = rand(4, 9); break;
+            case 6: a = 8; b = rand(5, 9); break;
+            case 7: a = 9; b = rand(5, 9); break;
+            case 8: a = rand(3, 7); b = rand(3, 7); break;
+            case 9: // Hard/Reverse
+                a = rand(4, 9); b = rand(4, 9);
+                if (state.hardcore) a += 10;
+                if (Math.random() > 0.5) return {q: `? × ${b} = ${a*b}`, ans: a};
+                return {q: `${a*b} : ${a} = ?`, ans: b};
+        }
+        if (state.hardcore) a += 10;
+        return Math.random() > 0.5 ? {q: `${a} × ${b} = ?`, ans: a*b} : {q: `${b} × ${a} = ?`, ans: a*b};
+    }
+
+    function startAnswerPhase() {
+        state.isAnswering = true;
+        const target = Math.min(state.positions[state.currentPlayer] + state.diceResult, state.boardSize);
+        state.currentProblem = generateProblem(target);
+
+        document.getElementById('problem-box').textContent = state.currentProblem.q;
+        document.getElementById('keypad').classList.remove('hidden');
+        document.getElementById('dice-btn').disabled = true;
+        document.querySelectorAll('.kp-btn').forEach(b => b.disabled = false);
+        state.inputBuffer = "";
+        startTimer();
+    }
+
+    function startTimer() {
+        clearInterval(state.timerInterval);
+        state.timerLeft = state.timerDuration; updateTimerBar();
+        state.timerInterval = setInterval(() => {
+            state.timerLeft--; updateTimerBar();
+            if (state.timerLeft <= 0) { clearInterval(state.timerInterval); submitAnswer(true); }
+        }, 1000);
+    }
+
+    function updateTimerBar() {
+        const pct = (state.timerLeft / state.timerDuration) * 100;
+        document.getElementById('timer-fill').style.width = pct + '%';
+        document.getElementById('timer-fill').style.background = state.timerLeft < 3 ? 'var(--error)' : 'var(--accent)';
+    }
+
+    function typeNum(n) { if (state.isAnswering && state.inputBuffer.length < 3) { state.inputBuffer += n; showInput(); } }
+    function clearInput() { if (!state.isAnswering) return; state.inputBuffer = state.inputBuffer.slice(0, -1); showInput(); }
+    function showInput() { document.getElementById('problem-box').textContent = `${state.currentProblem ? state.currentProblem.q : ''} ${state.inputBuffer}`; }
+
+    function handleKeyboardInput(event) {
+        // Don't intercept keyboard input when win-overlay is open (rating input)
+        if (!document.getElementById('win-overlay').classList.contains('hidden')) {
+            return;
+        }
+
+        const isSpaceKey = event.key === ' ' || event.code === 'Space';
+        if (!state.isAnswering) {
+            if (isSpaceKey && !state.isRolling) {
+                event.preventDefault();
+                rollDice();
+            }
+            return;
+        }
+
+        if (event.key === 'Enter') {
+            event.preventDefault();
+            submitAnswer();
+            return;
+        }
+        if (event.key === 'Backspace' || event.key === 'Delete') {
+            event.preventDefault();
+            clearInput();
+            return;
+        }
+        if (/^[0-9]$/.test(event.key)) {
+            event.preventDefault();
+            typeNum(Number(event.key));
+        }
+    }
+
+    function submitAnswer(timeout = false) {
+        if (!state.isAnswering) return;
+        const answerTime = state.timerDuration - state.timerLeft;
+        state.playerTime[state.currentPlayer] += answerTime;
+        clearInterval(state.timerInterval); state.isAnswering = false;
+        document.querySelectorAll('.kp-btn').forEach(b => b.disabled = true);
+
+        const userAns = parseInt(state.inputBuffer);
+        const correct = state.currentProblem.ans;
+        const isCorrect = !timeout && userAns === correct;
+        const startPos = state.positions[state.currentPlayer];
+        const target = Math.min(startPos + state.diceResult, state.boardSize);
+        const pName = state.players[state.currentPlayer];
+
+        const histText = `${pName} 📍${startPos} + 🎲${state.diceResult} ➜ ${state.currentProblem.q.replace('= ?','')} → ${timeout?'⏱':userAns} ${isCorrect?'✅':'❌'}`;
+
+        if (isCorrect) {
+            document.getElementById('problem-box').className = 'correct';
+            document.getElementById('problem-box').textContent = t('correct');
+            logHistory(histText, 'correct');
+            moveTokenTo(state.currentPlayer, target);
+            checkBonuses(target);
+
+            // Increment turn count for this player (on successful answer)
+            state.playerTurns[state.currentPlayer]++;
+
+            if (target >= state.boardSize) { setTimeout(checkWin, 600); return; }
+            if (state.extraTurn[state.currentPlayer]) {
+                state.extraTurn[state.currentPlayer] = false;
+                logBonus(`${t('bonus_token')} ${pName}!`);
+                setTimeout(endTurnPhase, 800);
+            } else { setTimeout(nextTurn, 1000); }
+        } else {
+            document.getElementById('problem-box').className = 'wrong';
+            document.getElementById('problem-box').textContent = timeout ? `${t('time_out')} ${t('correct_answer_prefix')} ${correct}` : `❌ ${t('correct_answer_prefix')} ${correct}`;
+            logHistory(histText, 'wrong');
+            setTimeout(nextTurn, 1500);
+        }
+
+        document.getElementById('keypad').classList.add('hidden');
+        document.getElementById('dice-btn').disabled = false;
+        document.getElementById('dice-btn').textContent = '🎲';
+    }
+
+    function checkBonuses(cell) {
+        const offset = cell % 10;
+        if (offset === 3) { state.skipNext[state.currentPlayer] = true; logBonus(`🦜 ${state.players[state.currentPlayer]} ${t('skip_token')}`); }
+        if (offset === 7) { state.extraTurn[state.currentPlayer] = true; logBonus(`🎁 ${state.players[state.currentPlayer]} ${t('bonus_extra_turn')}`); }
+    }
+
+    function nextTurn() {
+        state.currentPlayer = (state.currentPlayer + 1) % state.players.length;
+        updateUI();
+        showTurnPopup('🎮', `${state.players[state.currentPlayer]}`, t('turn_prefix'));
+
+        // If the next player must skip their turn - skip immediately
+        if (state.skipNext[state.currentPlayer]) {
+            state.skipNext[state.currentPlayer] = false;
+            logSystem(`🦜 ${state.players[state.currentPlayer]} ${t('skip_turn')}`);
+            showTurnPopup('🦜', `${state.players[state.currentPlayer]}`, t('skip_turn'));
+            setTimeout(nextTurn, 1500);
+        }
+    }
+    function endTurnPhase() { document.getElementById('keypad').classList.add('hidden'); document.getElementById('dice-btn').disabled = false; document.getElementById('dice-btn').textContent = '🎲'; updateUI(); showTurnPopup('🔄', `${state.players[state.currentPlayer]}`, t('turn_prefix')); }
+
+    function updateUI() {
+        const pIdx = state.currentPlayer;
+        document.getElementById('player-name').textContent = state.players[pIdx];
+        document.getElementById('turn-prefix').textContent = t('turn_prefix');
+        document.getElementById('player-badge').textContent = `P${pIdx + 1}`;
+        document.getElementById('player-badge').style.background = COLORS[pIdx];
+        document.querySelectorAll('.token').forEach((t, i) => t.classList.toggle('active', i === pIdx));
+
+        // Show/hide hardcore badge
+        document.getElementById('hardcore-badge').classList.toggle('hidden', !state.hardcore);
+    }
+
+    function showTurnPopup(icon, text, sub) {
+        const popup = document.getElementById('turn-popup');
+        document.getElementById('popup-icon').textContent = icon;
+        document.getElementById('popup-text').textContent = text;
+        document.getElementById('popup-sub').textContent = sub || '';
+        popup.classList.add('visible');
+        clearTimeout(popup._timeout);
+        popup._timeout = setTimeout(() => { popup.classList.remove('visible'); }, 1800);
+    }
+
+    function renderRating() {
+        const rating = loadRating();
+        const box = document.getElementById('rating-table');
+        if (rating.length === 0) {
+            box.innerHTML = '<div class="no-rating-text" data-i18n="no_ratings" style="color:#999; text-align:center; padding:10px;">Нема сачуваних рекорда</div>';
+            return;
+        }
+        let html = '<table style="width:100%; border-collapse:collapse;"><thead><tr><th style="text-align:left; padding:5px; border-bottom:2px solid #ddd;">' + t('placman') + '</th><th style="text-align:left; padding:5px; border-bottom:2px solid #ddd;">' + t('player') + '</th><th style="text-align:center; padding:5px; border-bottom:2px solid #ddd;">' + t('difficulty') + '</th><th style="text-align:right; padding:5px; border-bottom:2px solid #ddd;">' + t('time') + '</th><th style="text-align:center; padding:5px; border-bottom:2px solid #ddd;">' + t('moves') + '</th><th style="text-align:center; padding:5px; border-bottom:2px solid #ddd;">' + t('players') + '</th></tr></thead><tbody>';
+        rating.slice(0, 10).forEach((entry, i) => {
+            const place = ['🥇', '🥈', '🥉'][i] || (i + 1);
+            // Display difficulty as ×N format
+            let diff = entry.difficulty ? '×' + entry.difficulty : '×3';
+            if (entry.hardcore) diff += ' <span style="color:#d63031;font-weight:bold;">H</span>';
+            // Calculate total moves from playerTurns array if available
+            const moves = entry.turns ? entry.turns.reduce((a, b) => a + b, 0) : '-';
+            html += `<tr style="border-bottom:1px solid #eee;"><td style="padding:5px;">${place}</td><td style="padding:5px;">${entry.name}</td><td style="text-align:center; padding:5px;">${diff}</td><td style="text-align:right; padding:5px;">${entry.time}s</td><td style="text-align:center; padding:5px;">${moves}</td><td style="text-align:center; padding:5px;">${entry.players}</td></tr>`;
+        });
+        html += '</tbody></table>';
+        box.innerHTML = html;
+    }
+
+    function checkWin() {
+        const totalTime = state.playerTime.reduce((a, b) => a + b, 0);
+        const winnerName = state.players[state.currentPlayer];
+        document.getElementById('winner-name').textContent = winnerName;
+
+        // Show name input
+        const inputHtml = `
+            <p style="margin: 15px 0; font-size: 16px;">${t('time_total')} <strong>${totalTime} ${t('time_seconds')}</strong></p>
+            <div class="input-group" style="margin-bottom: 10px;">
+                <input type="text" id="winner-name-input" placeholder="${t('winner_name_placeholder')}" style="width: 100%; padding: 10px; border: 2px solid #ddd; border-radius: 8px; font-size: 16px;">
+            </div>
+            <button class="primary" onclick="saveAndShowRating()" data-i18n="save_rating"></button>
+            <button class="primary" style="margin-top: 8px; background: #95a5a6;" onclick="restartGame()" data-i18n="restart_button"></button>
+        `;
+        document.getElementById('win-box').innerHTML = `
+            <h1 data-i18n="win_title"></h1>
+            <h2>${winnerName}</h2>
+            <p>${t('islands_conquered')}</p>
+            ${inputHtml}
+        `;
+        translatePage(); // Apply translations to dynamically injected HTML
+        document.getElementById('win-overlay').classList.remove('hidden');
+        document.getElementById('winner-name-input').focus();
+    }
+
+    function saveAndShowRating() {
+        const name = document.getElementById('winner-name-input').value.trim() || t('anonymous');
+        const totalTime = state.playerTime.reduce((a, b) => a + b, 0);
+        addRatingEntry(name, totalTime, state.players.length);
+        document.getElementById('win-overlay').classList.add('hidden');
+        renderRating();
+        document.getElementById('setup-screen').style.display = 'block';
+        document.getElementById('game-screen').style.display = 'none';
+        // Re-enable language switcher on setup screen
+        document.querySelector('.lang-switch').classList.remove('hidden');
+    }
+
+    function restartGame() {
+        location.reload();
+    }
+
+    function logHistory(text, type) {
+        const box = document.getElementById('history');
+        if (box.children[0]?.classList.contains('system')) box.innerHTML = '';
+        const entry = document.createElement('div');
+        entry.className = `log-entry ${type === 'wrong' ? 'wrong' : type === 'bonus' ? 'bonus' : ''}`;
+        entry.textContent = text; box.appendChild(entry); box.scrollTop = box.scrollHeight;
+    }
+    function logBonus(text) { logHistory(text, 'bonus'); }
+    function logSystem(text) {
+        const box = document.getElementById('history');
+        if (box.children[0]?.classList.contains('system')) box.innerHTML = '';
+        const entry = document.createElement('div'); entry.className = 'log-entry system'; entry.textContent = text; box.appendChild(entry);
+    }
+
+    // Initialize language on page load
+    document.addEventListener('DOMContentLoaded', () => {
+        const savedLang = getCurrentLang();
+        document.getElementById('lang-select').value = savedLang;
+        document.documentElement.lang = savedLang;
+        translatePage();
+        renderRating();
+        updateDifficultyLabel(); // Initialize difficulty label on load
+        document.addEventListener('keydown', handleKeyboardInput);
+    });
+</script>
+</body>
+</html>
