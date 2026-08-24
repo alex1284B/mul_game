@@ -494,6 +494,16 @@
     function rand(min, max) { return Math.floor(Math.random() * (max - min + 1)) + min; }
 
     function startGame() {
+        // Force reset game state so leftover flags don't leak into a new game
+        clearInterval(state.timerInterval);
+        state.isAnswering = false;
+        state.isRolling = false;
+        document.getElementById('keypad').classList.add('hidden');
+        document.getElementById('dice-btn').disabled = false;
+        document.getElementById('dice-btn').textContent = '🎲';
+        document.getElementById('win-overlay').classList.add('hidden');
+        document.getElementById('history').innerHTML = '';
+
         renderRating();
         const num = parseInt(document.getElementById('num-players').value);
         const currentLang = getCurrentLang();
@@ -726,6 +736,11 @@
         clearInterval(state.timerInterval); state.isAnswering = false;
         document.querySelectorAll('.kp-btn').forEach(b => b.disabled = true);
 
+        // Reset UI before branching so it always runs (even on win)
+        document.getElementById('keypad').classList.add('hidden');
+        document.getElementById('dice-btn').disabled = false;
+        document.getElementById('dice-btn').textContent = '🎲';
+
         const userAns = parseInt(state.inputBuffer);
         const correct = state.currentProblem.ans;
         const isCorrect = !timeout && userAns === correct;
@@ -757,10 +772,6 @@
             logHistory(histText, 'wrong');
             setTimeout(nextTurn, 1500);
         }
-
-        document.getElementById('keypad').classList.add('hidden');
-        document.getElementById('dice-btn').disabled = false;
-        document.getElementById('dice-btn').textContent = '🎲';
     }
 
     function checkBonuses(cell) {
@@ -865,7 +876,16 @@
     }
 
     function restartGame() {
-        location.reload();
+        clearInterval(state.timerInterval);
+        state.players = [];
+        state.positions = [];
+        state.currentPlayer = 0;
+
+        document.getElementById('win-overlay').classList.add('hidden');
+        document.getElementById('game-screen').style.display = 'none';
+        document.getElementById('setup-screen').style.display = 'block';
+        document.querySelector('.lang-switch').classList.remove('hidden');
+        renderRating();
     }
 
     function logHistory(text, type) {
