@@ -4,102 +4,486 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title data-i18n="title">Математичко Авантура v2.2</title>
-    <style>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Comfortaa:wght@500;700&family=Nunito:wght@600;700;800;900&display=swap" rel="stylesheet">
+<style>
+       /* ============================================================
+           OCEAN MAP — design tokens
+           ============================================================ */
         :root {
-            --bg: #f0f4f8; --board-bg: #e2e8f0; --cell-bg: #ffffff;
-            --island-0: #ffeaa7; --island-1: #fab1a0; --island-2: #ff7675;
-            --island-3: #fd79a8; --island-4: #a29bfe; --island-5: #6c5ce7;
-            --island-6: #00b894; --island-7: #00cec9; --island-8: #0984e3; --island-9: #e84393;
-            --accent: #2d3436; --text: #2d3436; --success: #00b894; --error: #d63031;
-            --shadow: 0 4px 12px rgba(0,0,0,0.1);
+            /* sky / sea */
+            --sky-1: #eaf8ff; --sky-2: #d5efff; --sky-3: #bde6fb;
+            --sea-1: #6fcee9; --sea-2: #38a8d8; --sea-3: #1f83b6; --sea-deep: #0d5c88;
+            --foam: rgba(255, 255, 255, 0.55);
+            /* surfaces */
+            --card: #ffffff; --card-2: #f4fafd; --line: rgba(10, 51, 72, 0.10);
+            /* type + accents */
+            --ink: #0a3348; --muted: #5d7f92;
+            --accent: #0f9bd0; --accent-dark: #087aa8; --coral: #ff7a59;
+            --success: #12b886; --error: #e8483f; --gold: #ffc23d;
+            /* islands: a journey from sand to gold */
+            --isle-0: #ffd166; --isle-1: #ff9e6d; --isle-2: #ff7a9c; --isle-3: #e56bd0;
+            --isle-4: #b18cff; --isle-5: #7aa2ff; --isle-6: #4cc9f0; --isle-7: #2fd6b0;
+            --isle-8: #9be15d; --isle-9: #ffc23d;
+            /* shape language */
+            --r-lg: 26px; --r-md: 18px; --r-sm: 12px;
+            --shadow-sm: 0 2px 6px rgba(10, 51, 72, 0.10);
+            --shadow: 0 12px 28px rgba(10, 51, 72, 0.14);
+            --shadow-lg: 0 26px 64px rgba(10, 51, 72, 0.24);
+            --font-display: 'Comfortaa', 'Segoe UI', system-ui, sans-serif;
+            --font-body: 'Nunito', 'Segoe UI', system-ui, sans-serif;
         }
-        * { box-sizing: border-box; font-family: 'Segoe UI', system-ui, sans-serif; }
-        body { margin: 0; background: var(--bg); color: var(--text); display: flex; justify-content: center; align-items: center; min-height: 100vh; padding: 10px; }
 
-        /* SETUP */
-        #setup-screen { background: white; padding: 30px; border-radius: 16px; box-shadow: var(--shadow); max-width: 500px; width: 100%; text-align: center; }
-        #setup-screen h1 { margin: 0 0 20px; }
-        .input-group { margin-bottom: 15px; text-align: left; }
-        .input-group label { display: block; margin-bottom: 5px; font-weight: bold; }
-        .input-group input, .input-group select, .input-group .difficulty-wrapper { width: 100%; padding: 10px; border: 2px solid #ddd; border-radius: 8px; font-size: 16px; }
-        .difficulty-wrapper { padding: 0; border: none; }
-        .difficulty-wrapper label { margin-bottom: 8px; }
-        .difficulty-slider-container { display: flex; flex-direction: column; gap: 8px; }
-        .difficulty-slider-container input[type="range"] { width: 100%; cursor: pointer; }
-        .difficulty-label { font-weight: bold; color: var(--accent); text-align: center; font-size: 14px; min-height: 20px; }
-        button.primary { background: var(--accent); color: white; border: none; padding: 12px 24px; border-radius: 8px; font-size: 18px; cursor: pointer; width: 100%; transition: 0.2s; }
-        button.primary:hover { transform: translateY(-2px); }
+        * { box-sizing: border-box; font-family: var(--font-body); -webkit-tap-highlight-color: transparent; }
+        html { -webkit-text-size-adjust: 100%; }
+        body {
+            margin: 0; color: var(--ink); font-family: var(--font-body);
+            min-height: 100vh; padding: 18px; display: flex; justify-content: center; align-items: center;
+            background: linear-gradient(180deg, var(--sky-1) 0%, var(--sky-2) 46%, var(--sky-3) 100%);
+            overflow-x: hidden; font-variant-numeric: tabular-nums;
+        }
 
-        /* LANGUAGE SWITCHER HIDDEN DURING GAME */
+        /* ---------- animated sky / sea backdrop ---------- */
+        #backdrop { position: fixed; inset: 0; z-index: 0; pointer-events: none; overflow: hidden; }
+        #backdrop .sun {
+            position: absolute; top: -70px; right: -50px; width: 260px; height: 260px; border-radius: 50%;
+            background: radial-gradient(circle at 50% 50%, rgba(255, 229, 160, .95), rgba(255, 214, 120, .35) 55%, transparent 70%);
+        }
+        #backdrop .cloud {
+            position: absolute; height: 42px; border-radius: 40px; background: rgba(255, 255, 255, .82);
+            filter: blur(.3px); box-shadow: 0 10px 24px rgba(10, 51, 72, .07);
+        }
+        #backdrop .cloud::before, #backdrop .cloud::after {
+            content: ''; position: absolute; background: inherit; border-radius: 50%;
+        }
+        #backdrop .cloud::before { width: 58%; height: 165%; left: 12%; top: -78%; }
+        #backdrop .cloud::after  { width: 42%; height: 128%; right: 14%; top: -52%; }
+        #backdrop .c1 { width: 150px; top: 12%; left: -170px; animation: drift 68s linear infinite; }
+        #backdrop .c2 { width: 110px; top: 26%; left: -170px; animation: drift 92s linear infinite 14s; opacity: .8; }
+        #backdrop .c3 { width: 190px; top: 5%;  left: -210px; animation: drift 118s linear infinite 38s; opacity: .65; }
+        @keyframes drift { to { transform: translateX(calc(100vw + 260px)); } }
+        #backdrop .sea {
+            position: absolute; left: 0; right: 0; bottom: 0; height: 26vh; min-height: 130px;
+            background: linear-gradient(180deg, rgba(111, 206, 233, .0), rgba(56, 168, 216, .38) 42%, rgba(31, 131, 182, .5));
+        }
+        #backdrop .wave { position: absolute; left: -50%; width: 200%; height: 70px; opacity: .5; }
+        #backdrop .w1 { bottom: 20vh; animation: swell 15s ease-in-out infinite; }
+        #backdrop .w2 { bottom: 13vh; opacity: .35; animation: swell 21s ease-in-out infinite reverse; }
+        @keyframes swell { 0%,100% { transform: translateX(0) } 50% { transform: translateX(4%) } }
+
+        /* ---------- generic card ---------- */
+        .card, #setup-screen, #ui-panel, #board-container, #win-box, #turn-popup-box {
+            background: var(--card); border: 1px solid rgba(255, 255, 255, .7);
+            border-radius: var(--r-lg); box-shadow: var(--shadow);
+        }
+        h1, h2, h3 { font-family: var(--font-display); letter-spacing: -0.01em; }
+        button { font-family: var(--font-display); }
+        :focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+
+        /* ============================================================
+           SETUP SCREEN
+           ============================================================ */
+        #setup-screen { position: relative; z-index: 1; padding: 30px; max-width: 540px; width: 100%; text-align: center; }
+        #setup-screen h1 { margin: 0 0 6px; font-size: clamp(24px, 5vw, 34px); font-weight: 700; }
+        #setup-screen .tagline { margin: 0 0 22px; color: var(--muted); font-size: 15px; }
+        .input-group { margin-bottom: 18px; text-align: left; }
+        .input-group > label { display: block; margin-bottom: 8px; font-weight: 800; font-size: 14px; color: var(--ink); }
+        .input-group input, .input-group select {
+            width: 100%; padding: 12px 14px; border: 2px solid var(--line); border-radius: var(--r-sm);
+            font-size: 16px; background: var(--card-2); color: var(--ink); font-family: var(--font-body);
+        }
+        .input-group input:focus, .input-group select:focus { border-color: var(--accent); background: #fff; outline: none; }
+
+        /* player count chips with avatars */
+        .chip-row { display: flex; gap: 10px; }
+        .chip {
+            flex: 1; border: 2px solid var(--line); background: var(--card-2); border-radius: var(--r-md);
+            padding: 10px 6px 8px; cursor: pointer; text-align: center; transition: transform .15s ease, border-color .15s, background .15s;
+            display: flex; flex-direction: column; align-items: center; gap: 4px; min-height: 44px;
+        }
+        .chip .chip-avatars { font-size: 20px; letter-spacing: -2px; }
+        .chip .chip-num { font-family: var(--font-display); font-weight: 700; font-size: 13px; color: var(--muted); }
+        .chip:hover { transform: translateY(-2px); }
+        .chip[aria-pressed="true"] { border-color: var(--accent); background: #e6f6fd; box-shadow: var(--shadow-sm); }
+        .chip[aria-pressed="true"] .chip-num { color: var(--accent-dark); }
+
+        /* difficulty slider */
+        .difficulty-wrapper { padding: 0; }
+        .difficulty-slider-container { display: flex; flex-direction: column; gap: 6px; }
+        input[type="range"] { -webkit-appearance: none; appearance: none; width: 100%; height: 30px; background: transparent; cursor: pointer; }
+        input[type="range"]::-webkit-slider-runnable-track {
+            height: 12px; border-radius: 999px;
+            background: linear-gradient(90deg, var(--isle-0), var(--isle-3), var(--isle-6), var(--isle-9));
+            box-shadow: inset 0 1px 3px rgba(10, 51, 72, .2);
+        }
+        input[type="range"]::-moz-range-track {
+            height: 12px; border-radius: 999px;
+            background: linear-gradient(90deg, var(--isle-0), var(--isle-3), var(--isle-6), var(--isle-9));
+        }
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none; width: 26px; height: 26px; margin-top: -7px; border-radius: 50%;
+            background: #fff; border: 3px solid var(--accent); box-shadow: var(--shadow-sm);
+        }
+        input[type="range"]::-moz-range-thumb { width: 22px; height: 22px; border-radius: 50%; background: #fff; border: 3px solid var(--accent); }
+        .difficulty-scale { display: flex; justify-content: space-between; font-size: 16px; padding: 0 4px; }
+        .difficulty-label {
+            font-family: var(--font-display); font-weight: 700; color: var(--accent-dark); text-align: center;
+            font-size: 15px; min-height: 22px; background: #e6f6fd; border-radius: 999px; padding: 4px 12px; align-self: center;
+        }
+
+        /* hardcore + settings cards */
+        .toggle-card {
+            display: flex; align-items: center; gap: 12px; padding: 12px 14px; border: 2px solid var(--line);
+            border-radius: var(--r-md); background: var(--card-2); cursor: pointer; transition: border-color .15s, background .15s;
+        }
+        .toggle-card:has(input:checked) { border-color: var(--error); background: #fff1ef; }
+        .toggle-card input { width: 22px; height: 22px; accent-color: var(--error); cursor: pointer; flex: none; }
+        .toggle-card .toggle-text { font-weight: 800; }
+        .toggle-card .toggle-hint { font-size: 12px; color: var(--muted); font-weight: 600; }
+
+        button.primary {
+            background: linear-gradient(180deg, var(--coral), #f4603c); color: #fff; border: none;
+            padding: 15px 24px; border-radius: var(--r-md); font-size: 19px; font-weight: 700; cursor: pointer; width: 100%;
+            box-shadow: 0 8px 20px rgba(244, 96, 60, .35); transition: transform .15s ease, box-shadow .15s ease;
+        }
+        button.primary:hover { transform: translateY(-2px); box-shadow: 0 14px 28px rgba(244, 96, 60, .4); }
+        button.primary:active { transform: translateY(0); }
+        button.secondary {
+            background: var(--card-2); color: var(--ink); border: 2px solid var(--line); padding: 12px 20px;
+            border-radius: var(--r-md); font-size: 16px; font-weight: 700; cursor: pointer; width: 100%; transition: background .15s;
+        }
+        button.secondary:hover { background: #e9f3f8; }
+
+        /* records */
+        .rating-block { margin-top: 24px; }
+        .rating-block h3 { margin: 0 0 10px; font-size: 17px; }
+        #setup-screen .rating-head { display: flex; align-items: center; justify-content: space-between; margin: 24px 0 8px; text-align: left; }
+        #setup-screen .rating-head h3 { margin: 0; font-size: 17px; }
+        #rating-table { max-height: 170px; overflow-y: auto; background: var(--card-2); padding: 8px; border-radius: var(--r-md); font-size: 13px; border: 1px solid var(--line); }
+        #rating-table table { width: 100%; border-collapse: collapse; }
+        #rating-table thead th {
+            position: sticky; top: 0; background: var(--card-2); text-align: left; padding: 8px 6px; font-size: 11px;
+            text-transform: uppercase; letter-spacing: .06em; color: var(--muted); border-bottom: 2px solid var(--line);
+        }
+        #rating-table th:nth-child(n+3), #rating-table td:nth-child(n+3) { text-align: center; }
+        #rating-table th:nth-child(4), #rating-table td:nth-child(4) { text-align: right; }
+        #rating-table tbody tr { border-bottom: 1px solid var(--line); }
+        #rating-table tbody tr:nth-child(odd) { background: rgba(255, 255, 255, .7); }
+        #rating-table td { padding: 8px 6px; font-weight: 700; }
+        #rating-table .medal { font-size: 16px; }
+        .badge-hardcore { background: #ffe3df; color: #c0271d; border-radius: 999px; padding: 1px 7px; font-size: 11px; font-weight: 900; }
+        .no-rating-text { color: var(--muted); text-align: center; padding: 14px 10px; font-weight: 700; }
+
+        /* ============================================================
+           LANGUAGE SWITCHER
+           ============================================================ */
+        .lang-switch { position: fixed; top: 14px; right: 14px; z-index: 200; }
         .lang-switch.hidden { display: none !important; }
+        #lang-select {
+            padding: 9px 14px; border-radius: 999px; border: 2px solid rgba(255, 255, 255, .9); font-size: 14px; font-weight: 800;
+            cursor: pointer; background: rgba(255, 255, 255, .85); color: var(--ink); box-shadow: var(--shadow-sm);
+            font-family: var(--font-display); backdrop-filter: blur(6px);
+        }
 
-        /* LANGUAGE SWITCHER */
-        .lang-switch { position: fixed; top: 15px; right: 15px; z-index: 200; }
-        #lang-select { padding: 8px 12px; border-radius: 8px; border: 2px solid #ddd; font-size: 14px; cursor: pointer; background: white; }
+        /* ============================================================
+           GAME SCREEN
+           ============================================================ */
+        #game-screen {
+            position: relative; z-index: 1; display: none; width: 100%; max-width: 1160px;
+            grid-template-columns: minmax(0, 1fr) 384px; gap: 24px; align-items: start; justify-content: center;
+        }
+        #game-screen.on { display: grid; }
 
-        /* GAME */
-        #game-screen { display: none; width: 100%; max-width: 1200px; gap: 20px; flex-wrap: wrap; justify-content: center; }
+        /* ---------- board: a map on the sea ---------- */
+        #board-container {
+            position: relative; padding: 16px; overflow: hidden;
+            background:
+                radial-gradient(120% 90% at 50% -10%, rgba(255, 255, 255, .5), transparent 60%),
+                linear-gradient(180deg, var(--sea-1) 0%, var(--sea-2) 55%, var(--sea-3) 100%);
+            border: 1px solid rgba(255, 255, 255, .5);
+        }
+        #board-container::after { /* moving light on water */
+            content: ''; position: absolute; inset: 0; pointer-events: none; opacity: .35;
+            background-image: repeating-linear-gradient(115deg, rgba(255,255,255,.22) 0 2px, transparent 2px 26px);
+            animation: water 9s linear infinite;
+        }
+        @keyframes water { to { transform: translateX(26px); } }
 
-        #board-container { position: relative; background: var(--board-bg); padding: 10px; border-radius: 12px; box-shadow: var(--shadow); }
-        #board { display: grid; grid-template-columns: repeat(10, 1fr); grid-template-rows: repeat(10, 1fr); width: min(80vw, 600px); height: min(80vw, 600px); gap: 2px; }
-        #board.dynamic-grid { grid-template-columns: repeat(auto-fill, minmax(min(8vw, 60px), 1fr)); }
-        .cell { background: var(--cell-bg); border-radius: 6px; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 13px; position: relative; overflow: hidden; }
-        .cell.finish { background: linear-gradient(135deg, #f1c40f, #f39c12); border: 2px dashed #fff; color: #000; }
-        .island-bg { position: absolute; inset: 0; pointer-events: none; border-radius: 6px; opacity: 0.6; z-index: 0; }
-        .cell span.num { z-index: 1; font-size: 11px; }
-        .cell-icon { position: absolute; top: 3px; right: 3px; font-size: 12px; z-index: 2; filter: drop-shadow(0 1px 2px rgba(0,0,0,0.2)); }
+        #start-pad {
+            position: relative; z-index: 2; display: flex; align-items: center; gap: 8px;
+            background: rgba(255, 255, 255, .22); border: 2px dashed rgba(255, 255, 255, .75);
+            border-radius: 999px; padding: 6px 14px; margin-bottom: 12px; width: max-content;
+            color: #fff; font-family: var(--font-display); font-weight: 700; font-size: 14px; letter-spacing: .04em;
+            text-shadow: 0 1px 2px rgba(13, 92, 136, .6);
+        }
+        #start-pad .boat { font-size: 18px; }
+        #start-pad .start-label { text-transform: uppercase; font-size: 12px; letter-spacing: .12em; opacity: .9; }
+        #start-pad .cell { width: 34px; height: 34px; flex: none; font-size: 12px; border-color: rgba(255,255,255,.9); }
 
-        .token { position: absolute; width: 28px; height: 28px; border-radius: 50%; border: 3px solid white; box-shadow: 0 2px 8px rgba(0,0,0,0.3); transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1); z-index: 10; display: flex; align-items: center; justify-content: center; color: white; font-weight: bold; font-size: 12px; }
-        .token.active { box-shadow: 0 0 0 4px rgba(0,0,0,0.2), 0 2px 8px rgba(0,0,0,0.3); transform: scale(1.1); z-index: 11; }
-        .token.p0 { background: #e17055; } .token.p1 { background: #0984e3; }
-        .token.p2 { background: #00b894; } .token.p3 { background: #6c5ce7; }
+        #board { position: relative; z-index: 1; display: flex; flex-direction: column-reverse; gap: 10px; width: min(100%, 640px); margin: 0 auto; }
+        /* island band: one rounded landmass per row */
+        .isle {
+            position: relative; z-index: 0; margin: -5px; border-radius: 20px;
+            display: flex; gap: 5px; padding: 5px;
+            box-shadow: inset 0 -4px 0 rgba(10, 51, 72, .13), 0 3px 10px rgba(13, 92, 136, .28);
+        }
+        .isle.rev { flex-direction: row-reverse; }
+        .isle-flag { position: absolute; top: -3px; right: 2px; font-size: 13px; opacity: .75; }
 
-        #ui-panel { background: white; padding: 20px; border-radius: 12px; box-shadow: var(--shadow); flex: 1; min-width: 320px; max-width: 420px; display: flex; flex-direction: column; gap: 15px; }
-        #turn-info { display: flex; justify-content: space-between; align-items: center; padding: 10px; background: #f8f9fa; border-radius: 8px; }
-        #player-badge { padding: 5px 10px; border-radius: 6px; color: white; font-weight: bold; }
+        .cell {
+            position: relative; z-index: 1; flex: 1 1 0; min-width: 0; aspect-ratio: 1 / 1; background: #fff; border-radius: 10px;
+            display: flex; align-items: center; justify-content: center; overflow: hidden;
+            box-shadow: 0 2px 0 rgba(10, 51, 72, .12), inset 0 1px 0 rgba(255, 255, 255, .9);
+            font-family: var(--font-display); font-weight: 700; font-size: 13px; color: var(--ink);
+        }
+        .cell span.num { z-index: 2; font-size: clamp(9px, 1.6vw, 13px); }
+        .cell .isle-tint { position: absolute; inset: 0; border-radius: 10px; opacity: .18; }
+        .cell.start-cell { background: #fff; }
+        .cell.finish {
+            background: linear-gradient(150deg, #fff3cd, #ffd166 60%, #f7b32b); color: #6b4300;
+            border: 2px solid #fff; font-size: 15px;
+        }
+        .cell.finish .num { position: absolute; bottom: 1px; right: 3px; font-size: 9px; opacity: .7; }
+        .cell.finish::after { /* treasure shine */
+            content: ''; position: absolute; inset: -40%; background: linear-gradient(115deg, transparent 42%, rgba(255,255,255,.85) 50%, transparent 58%);
+            animation: shine 3.4s ease-in-out infinite;
+        }
+        @keyframes shine { 0%,72% { transform: translateX(-70%) } 100% { transform: translateX(70%) } }
+        /* bonus cells: same trophy treatment, their own colors */
+        .cell.skip {
+            background: linear-gradient(150deg, #e6fcf7, #4cc9f0 55%, #1aa3cc); color: #0a4a5e;
+            border: 2px solid #fff; box-shadow: 0 2px 0 rgba(10, 51, 72, .16), inset 0 1px 0 rgba(255, 255, 255, .9);
+        }
+        .cell.gem {
+            background: linear-gradient(150deg, #ffeaf3, #ff9ec4 52%, #ff6fa5); color: #7a1746;
+            border: 2px solid #fff; box-shadow: 0 2px 0 rgba(10, 51, 72, .16), inset 0 1px 0 rgba(255, 255, 255, .9);
+        }
+        .cell-sym {
+            font-size: clamp(15px, 2.7vw, 23px); line-height: 1; z-index: 2;
+            filter: drop-shadow(0 1px 2px rgba(10, 51, 72, .35));
+        }
+        .cell.skip .num, .cell.gem .num { position: absolute; bottom: 1px; right: 3px; font-size: 9px; opacity: .75; }
+        .cell.skip::after, .cell.gem::after { /* shared shine sweep, offset so they don't blink in sync */
+            content: ''; position: absolute; inset: -40%;
+            background: linear-gradient(115deg, transparent 42%, rgba(255, 255, 255, .8) 50%, transparent 58%);
+            animation: shine 3.4s ease-in-out infinite;
+        }
+        .cell.skip::after { animation-delay: .6s; }
+        .cell.gem::after { animation-delay: 1.5s; }
+        .cell.pop { animation: cellPop .5s ease-out; }
+        @keyframes cellPop { 0% { transform: scale(1) } 40% { transform: scale(1.16) } 100% { transform: scale(1) } }
 
-        #dice-btn { width: 80px; height: 80px; background: white; border: 3px solid #ddd; border-radius: 12px; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 40px; margin: 0 auto; transition: 0.2s; box-shadow: var(--shadow); }
-        #dice-btn:hover:not(:disabled) { transform: scale(1.05); background: #f1f2f6; }
-        #dice-btn:disabled { opacity: 0.5; cursor: not-allowed; }
-        #dice-btn.rolling { animation: shake 0.5s infinite; }
-        @keyframes shake { 0%,100%{transform:rotate(0deg)} 25%{transform:rotate(-15deg)} 75%{transform:rotate(15deg)} }
+        /* ---------- tokens ---------- */
+        #tokens-container { position: absolute; inset: 0; pointer-events: none; z-index: 10; }
+        /* token = position-only shell (JS transform), .token-body hops, .token-animal bobs —
+           layered so animations never scale the translate3d position */
+        .token {
+            position: absolute; top: 0; left: 0; width: 30px; height: 30px; border-radius: 50%;
+            border: 2px solid #fff;
+            box-shadow: 0 3px 8px rgba(10, 51, 72, .45), inset 0 2px 3px rgba(255, 255, 255, .5), inset 0 -3px 4px rgba(0, 0, 0, .16);
+            transition: transform .17s ease-out, width .25s ease, height .25s ease;
+            will-change: transform;
+        }
+        .token-body {
+            position: absolute; inset: 0; border-radius: 50%;
+            display: flex; align-items: center; justify-content: center;
+        }
+        .token-animal { display: block; line-height: 1; filter: drop-shadow(0 1px 1px rgba(0, 0, 0, .22)); }
+        .token.active { box-shadow: 0 0 0 3px rgba(255, 255, 255, .9), 0 0 0 6px rgba(10, 51, 72, .25), 0 4px 10px rgba(10, 51, 72, .45); }
+        .token.hop .token-body { animation: hop .17s ease-out; }
+        @keyframes hop { 0% { transform: scale(1, 1) } 30% { transform: scale(.84, 1.16) } 60% { transform: scale(1.1, .9) } 100% { transform: scale(1, 1) } }
+        .token.active .token-animal { animation: bob 1.5s ease-in-out infinite; }
+        @keyframes bob { 0%, 100% { transform: translateY(0) } 50% { transform: translateY(-2.5px) } }
+        .token.p0 { background: linear-gradient(160deg, #ffc4ad, #ff7a59 55%, #e2593a); }
+        .token.p1 { background: linear-gradient(160deg, #a4dcf6, #38a8d8 55%, #1d84b0); }
+        .token.p2 { background: linear-gradient(160deg, #82e8c4, #12b886 55%, #0a9268); }
+        .token.p3 { background: linear-gradient(160deg, #d9c9ff, #b18cff 55%, #8f66e6); }
 
-        #problem-box { text-align: center; font-size: 26px; font-weight: bold; padding: 12px; background: #f1f2f6; border-radius: 8px; min-height: 55px; display: flex; align-items: center; justify-content: center; transition: background 0.3s; }
-        #problem-box.correct { background: var(--success); color: white; }
-        #problem-box.wrong { background: var(--error); color: white; }
+        /* floating "+1" and correct/wrong micro-feedback */
+        .float-plus {
+            position: absolute; z-index: 20; font-family: var(--font-display); font-weight: 900; color: #fff;
+            text-shadow: 0 2px 7px rgba(10, 51, 72, .6), 0 0 2px rgba(10, 51, 72, .35); font-size: 21px;
+            animation: floatUp 1.8s cubic-bezier(.2, .7, .3, 1) forwards; pointer-events: none;
+        }
+        /* pop in, hold readable over the landing cell, then drift away */
+        /* total rise stays under half a cell so #board-container never clips it on the top row */
+        @keyframes floatUp {
+            0% { transform: translateY(5px) scale(.6); opacity: 0 }
+            14% { transform: translateY(0) scale(1.14); opacity: 1 }
+            24% { transform: translateY(-1px) scale(1) }
+            66% { transform: translateY(-10px) scale(1); opacity: 1 }
+            100% { transform: translateY(-18px) scale(.92); opacity: 0 }
+        }
 
-        #keypad { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
-        .kp-btn { padding: 12px; font-size: 20px; border: none; border-radius: 8px; background: #dfe6e9; cursor: pointer; transition: 0.1s; }
-        .kp-btn:hover { background: #b2bec3; }
-        .kp-btn.enter { background: var(--success); color: white; grid-column: span 2; }
-        .kp-btn.clear { background: var(--error); color: white; }
-        .kp-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+        /* ---------- UI panel ---------- */
+        #ui-panel { padding: 20px; display: flex; flex-direction: column; gap: 16px; }
+        #turn-info {
+            display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 12px 14px;
+            background: var(--card-2); border-radius: var(--r-md); border: 1px solid var(--line);
+        }
+        #turn-info #turn-prefix { display: block; font-size: 11px; text-transform: uppercase; letter-spacing: .07em; color: var(--muted); font-weight: 800; }
+        #player-name { font-family: var(--font-display); font-weight: 700; font-size: 18px; }
+        #player-badge {
+            padding: 6px 12px; border-radius: 999px; color: #fff; font-weight: 800; font-size: 13px;
+            font-family: var(--font-display); box-shadow: var(--shadow-sm); flex: none;
+        }
+        #hardcore-badge {
+            text-align: center; background: linear-gradient(135deg, #ff8a5c, #e8483f); color: #fff; padding: 8px 12px;
+            border-radius: var(--r-sm); font-weight: 900; font-size: 13px; letter-spacing: .1em;
+            box-shadow: 0 6px 16px rgba(232, 72, 63, .3);
+        }
 
-        #timer-bar { height: 8px; background: #dfe6e9; border-radius: 4px; overflow: hidden; }
-        #timer-fill { height: 100%; width: 100%; background: var(--accent); transition: width 1s linear; }
+        /* dice + timer ring */
+        #dice-wrap { position: relative; width: 108px; height: 108px; margin: 2px auto; }
+        #timer-ring { position: absolute; inset: 0; width: 100%; height: 100%; transform: rotate(-90deg); pointer-events: none; }
+        #timer-ring circle { fill: none; stroke-width: 7; }
+        #timer-ring .ring-track { stroke: var(--line); }
+        #timer-ring .ring-fill { stroke: var(--success); stroke-linecap: round; transition: stroke-dashoffset .3s linear, stroke .3s; }
+        #timer-ring .ring-fill.warn { stroke: var(--gold); }
+        #timer-ring .ring-fill.danger { stroke: var(--error); }
+        #dice-btn {
+            position: absolute; inset: 12px; background: #fff; border: 3px solid var(--line); border-radius: var(--r-md);
+            cursor: pointer; display: grid; place-items: center; box-shadow: var(--shadow-sm); transition: transform .15s ease, background .15s;
+            touch-action: manipulation; user-select: none;
+        }
+        #dice-btn:hover:not(:disabled) { transform: scale(1.06); background: #f7fcff; }
+        #dice-btn:disabled { opacity: .55; cursor: not-allowed; }
+        #dice-btn .face { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; width: 46px; height: 46px; }
+        #dice-btn .pip { border-radius: 50%; background: transparent; }
+        #dice-btn .pip.on { background: var(--ink); box-shadow: inset 0 -1px 0 rgba(255, 255, 255, .35); }
+        #dice-btn.tumble .face { animation: tumble .58s cubic-bezier(.3, 1.4, .5, 1); }
+        @keyframes tumble {
+            0% { transform: rotateX(0) rotateZ(0) scale(1) }
+            35% { transform: rotateX(180deg) rotateZ(90deg) scale(.82) }
+            70% { transform: rotateX(360deg) rotateZ(180deg) scale(1.12) }
+            100% { transform: rotateX(360deg) rotateZ(360deg) scale(1) }
+        }
+        #timer-label { text-align: center; font-size: 12px; font-weight: 800; color: var(--muted); letter-spacing: .04em; min-height: 16px; }
+        #timer-label.danger { color: var(--error); }
 
-        #history { height: 180px; overflow-y: auto; background: #f8f9fa; padding: 10px; border-radius: 8px; font-size: 13px; line-height: 1.5; border: 1px solid #eee; scroll-behavior: smooth; }
-        .log-entry { padding: 4px 6px; margin-bottom: 4px; border-radius: 4px; border-left: 4px solid transparent; background: #fff; box-shadow: 0 1px 2px rgba(0,0,0,0.05); }
-        .log-entry.wrong { border-left-color: var(--error); background: #ffeaea; color: var(--error); font-weight: 600; }
-        .log-entry.bonus { border-left-color: #f39c12; background: #fff9e6; }
-        .log-entry.system { border-left-color: #95a5a6; font-style: italic; color: #666; }
+        /* problem box */
+        #problem-box {
+            text-align: center; font-family: var(--font-display); font-size: 26px; font-weight: 700; padding: 14px 12px;
+            background: var(--card-2); border: 2px solid var(--line); border-radius: var(--r-md); min-height: 62px;
+            display: flex; align-items: center; justify-content: center; transition: background .25s, color .25s, border-color .25s;
+        }
+        #problem-box.correct { background: var(--success); border-color: var(--success); color: #fff; }
+        #problem-box.wrong { background: var(--error); border-color: var(--error); color: #fff; }
+        #problem-box.shake { animation: shakeX .4s ease-in-out; }
+        @keyframes shakeX { 0%,100% { transform: translateX(0) } 20% { transform: translateX(-7px) } 40% { transform: translateX(6px) } 60% { transform: translateX(-4px) } 80% { transform: translateX(3px) } }
 
+        /* keypad */
+        #keypad { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+        .kp-btn {
+            padding: 14px 0; min-height: 56px; font-size: 22px; font-weight: 700; border: none; border-radius: var(--r-sm);
+            background: #eaf3f8; color: var(--ink); cursor: pointer; box-shadow: 0 3px 0 #cfE2ec; transition: transform .08s, box-shadow .08s, background .15s;
+            touch-action: manipulation; user-select: none;
+        }
+        .kp-btn:hover { background: #dbeaf3; }
+        .kp-btn:active { transform: translateY(3px); box-shadow: 0 0 0 #cfE2ec; }
+        .kp-btn.enter { background: var(--success); color: #fff; box-shadow: 0 3px 0 #0d9b72; }
+        .kp-btn.enter:active { box-shadow: 0 0 0 #0d9b72; }
+        .kp-btn.clear { background: #ffe3df; color: #c0271d; box-shadow: 0 3px 0 #f5bdb6; }
+        .kp-btn.clear:active { box-shadow: 0 0 0 #f5bdb6; }
+        .kp-btn:disabled { opacity: .4; cursor: not-allowed; }
+
+        /* history */
+        #history {
+            max-height: 190px; overflow-y: auto; background: var(--card-2); padding: 10px; border-radius: var(--r-md);
+            font-size: 13px; line-height: 1.45; border: 1px solid var(--line); scroll-behavior: smooth;
+        }
+        #history::-webkit-scrollbar { width: 8px; }
+        #history::-webkit-scrollbar-thumb { background: #c9dde8; border-radius: 999px; }
+        .log-entry {
+            display: flex; align-items: center; gap: 8px; padding: 7px 9px; margin-bottom: 6px; border-radius: var(--r-sm);
+            border-left: 4px solid var(--success); background: #fff; box-shadow: var(--shadow-sm); font-weight: 700;
+        }
+        .log-entry.wrong { border-left-color: var(--error); background: #fff1ef; color: #c0271d; }
+        .log-entry.bonus { border-left-color: var(--gold); background: #fff8e5; color: #8a5b00; }
+        .log-entry.system { border-left-color: #9fb8c6; font-style: italic; color: var(--muted); font-weight: 600; }
+        .no-history-text { color: var(--muted); font-weight: 700; padding: 6px 4px; }
+        .log-dot { width: 10px; height: 10px; border-radius: 50%; flex: none; box-shadow: 0 1px 3px rgba(10,51,72,.3); }
+        .log-answer { margin-left: auto; font-variant-numeric: tabular-nums; }
+        #history .log-entry:nth-last-child(n+6) { opacity: .45; }
+
+        /* ============================================================
+           OVERLAYS
+           ============================================================ */
         .hidden { display: none !important; }
-        #win-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.8); display: flex; align-items: center; justify-content: center; z-index: 100; backdrop-filter: blur(5px); }
-        #win-box { background: white; padding: 40px; border-radius: 16px; text-align: center; animation: pop 0.3s ease-out; box-shadow: var(--shadow); }
-        @keyframes pop { from { transform: scale(0.8); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+        #confetti-canvas { position: fixed; inset: 0; z-index: 400; pointer-events: none; }
 
-        /* TURN POPUP */
-        #turn-popup { position: fixed; top: 0; left: 0; right: 0; bottom: 0; display: flex; align-items: center; justify-content: center; z-index: 300; pointer-events: none; opacity: 0; transition: opacity 0.3s ease; }
+        #win-overlay {
+            position: fixed; inset: 0; background: rgba(8, 46, 68, .72); display: flex; align-items: center; justify-content: center;
+            z-index: 100; backdrop-filter: blur(6px); padding: 16px;
+        }
+        #win-box { padding: 32px 28px; text-align: center; animation: pop .35s cubic-bezier(.3, 1.5, .5, 1); max-width: 460px; width: 100%; max-height: 92vh; overflow-y: auto; }
+        #win-box h1 { margin: 0 0 4px; font-size: clamp(26px, 6vw, 38px); }
+        #win-box h2 { margin: 0 0 10px; font-size: 22px; color: var(--accent-dark); }
+        #win-box p { margin: 0 0 14px; color: var(--muted); font-weight: 700; }
+                .name-input { width: 100%; padding: 12px 14px; border: 2px solid var(--line); border-radius: var(--r-md); font-size: 16px; font-weight: 700; background: var(--card-2); }
+        .name-input:focus { outline: none; border-color: var(--accent); background: #fff; }
+        .win-btn-row { display: flex; gap: 10px; margin-top: 10px; }
+        .win-btn-row button { flex: 1; margin-top: 0; }
+        .stars { font-size: 34px; letter-spacing: 4px; margin-bottom: 12px; }
+        .stats-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 18px; }
+        .stat { background: var(--card-2); border: 1px solid var(--line); border-radius: var(--r-sm); padding: 10px 6px; }
+        .stat .v { font-family: var(--font-display); font-weight: 700; font-size: 20px; color: var(--ink); }
+        .stat .k { font-size: 11px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); font-weight: 800; }
+        @keyframes pop { from { transform: scale(.85); opacity: 0 } to { transform: scale(1); opacity: 1 } }
+
+        /* turn popup */
+        #turn-popup {
+            position: fixed; top: 0; left: 0; right: 0; bottom: 0; display: flex; align-items: center; justify-content: center;
+            z-index: 300; pointer-events: none; opacity: 0; transition: opacity .3s ease;
+        }
         #turn-popup.visible { opacity: 1; }
-        #turn-popup-bg { position: absolute; inset: 0; background: rgba(0,0,0,0.55); backdrop-filter: blur(3px); }
-        #turn-popup-box { position: relative; background: white; padding: 24px 40px; border-radius: 16px; text-align: center; box-shadow: 0 8px 32px rgba(0,0,0,0.3); animation: pop 0.3s ease-out; max-width: 90vw; }
-        #turn-popup-box .popup-icon { font-size: 48px; margin-bottom: 8px; }
-        #turn-popup-box .popup-text { font-size: 22px; font-weight: bold; color: var(--text); }
-        #turn-popup-box .popup-sub { font-size: 15px; color: #666; margin-top: 4px; }
+        #turn-popup-bg { position: absolute; inset: 0; background: rgba(8, 46, 68, .5); backdrop-filter: blur(3px); }
+        #turn-popup-box {
+            position: relative; padding: 26px 44px; text-align: center; box-shadow: var(--shadow-lg);
+            animation: popUp .35s cubic-bezier(.3, 1.5, .5, 1); max-width: 90vw;
+        }
+        @keyframes popUp { from { transform: scale(.7) translateY(14px); opacity: 0 } to { transform: scale(1) translateY(0); opacity: 1 } }
+        #turn-popup-box .popup-icon { font-size: 56px; margin-bottom: 6px; }
+        #turn-popup-box .popup-text { font-family: var(--font-display); font-size: 24px; font-weight: 700; color: var(--ink); }
+        #turn-popup-box .popup-sub { font-size: 14px; color: var(--muted); margin-top: 4px; font-weight: 700; text-transform: uppercase; letter-spacing: .07em; }
+
+        /* ============================================================
+           RESPONSIVE
+           ============================================================ */
+        @media (max-width: 980px) {
+            body { align-items: flex-start; padding: 12px 10px 0; }
+            #game-screen { grid-template-columns: minmax(0, 1fr); }
+            #ui-panel { position: sticky; bottom: 0; z-index: 30; border-radius: var(--r-lg) var(--r-lg) 0 0; box-shadow: var(--shadow-lg); gap: 12px; }
+        }
+        @media (max-width: 520px) {
+            #ui-panel { padding: 14px 12px calc(14px + env(safe-area-inset-bottom, 0px)); }
+            #problem-box { font-size: 21px; min-height: 54px; padding: 10px 8px; }
+            .kp-btn { min-height: 52px; font-size: 20px; }
+            #history { max-height: 110px; }
+            #dice-wrap { width: 96px; height: 96px; }
+            .stats-grid { grid-template-columns: repeat(2, 1fr); }
+        }
+
+        /* ============================================================
+           REDUCED MOTION
+           ============================================================ */
+        @media (prefers-reduced-motion: reduce) {
+            *, *::before, *::after { animation-duration: .001ms !important; animation-iteration-count: 1 !important; transition-duration: .001ms !important; scroll-behavior: auto !important; }
+            /* the +X is feedback, not decoration: show it plainly instead of fading it out instantly */
+            .float-plus { animation: none; opacity: 1; transform: none; }
+        }
+
     </style>
 </head>
 <body>
+<div id="backdrop" aria-hidden="true">
+    <div class="sun"></div>
+    <div class="cloud c1"></div><div class="cloud c2"></div><div class="cloud c3"></div>
+    <div class="wave w1"><svg viewBox="0 0 1440 70" preserveAspectRatio="none" width="100%" height="100%"><path fill="#6fcee9" d="M0,35 C180,70 360,0 540,35 C720,70 900,0 1080,35 C1260,70 1440,0 1440,35 L1440,70 L0,70 Z"/></svg></div>
+    <div class="wave w2"><svg viewBox="0 0 1440 70" preserveAspectRatio="none" width="100%" height="100%"><path fill="#38a8d8" d="M0,35 C240,0 480,70 720,35 C960,0 1200,70 1440,35 L1440,70 L0,70 Z"/></svg></div>
+    <div class="sea"></div>
+</div>
 
 <!-- Language Switcher -->
 <div class="lang-switch">
@@ -112,25 +496,28 @@
 
 <div id="setup-screen">
     <h1 data-i18n="game_title">🌊 Математичко Авантура</h1>
+    <p class="tagline" data-i18n="tagline">Трката на множењу — освој свих 10 острва!</p>
     <div class="input-group">
         <label data-i18n="players_label">Број играча (2-4)</label>
-        <select id="num-players">
-            <option value="2" data-i18n="players_2">2 играча</option>
-            <option value="3" data-i18n="players_3">3 играча</option>
-            <option value="4" data-i18n="players_4">4 играча</option>
-        </select>
+        <div class="chip-row" role="group" aria-label="players">
+            <button type="button" class="chip" data-players="2" aria-pressed="true" onclick="setPlayerCount(2)"><span class="chip-avatars">🦁🐯</span><span class="chip-num">2</span></button>
+            <button type="button" class="chip" data-players="3" aria-pressed="false" onclick="setPlayerCount(3)"><span class="chip-avatars">🦁🐯🦊</span><span class="chip-num">3</span></button>
+            <button type="button" class="chip" data-players="4" aria-pressed="false" onclick="setPlayerCount(4)"><span class="chip-avatars">🦁🐯🦊🐼</span><span class="chip-num">4</span></button>
+        </div>
+        <input type="hidden" id="num-players" value="2">
     </div>
     <div class="input-group difficulty-wrapper">
         <div class="difficulty-slider-container">
             <label data-i18n="difficulty_label">Ниво сложености</label>
             <input type="range" id="difficulty" min="1" max="10" value="10" oninput="updateDifficultyLabel()">
+            <div class="difficulty-scale" aria-hidden="true"><span>🐣</span><span>🐢</span><span>🐰</span><span>🦅</span><span>🐉</span></div>
             <div class="difficulty-label" id="difficulty-label" data-i18n="difficulty_hint_10">×10 (100 поља)</div>
         </div>
     </div>
     <div class="input-group">
-        <label style="display:flex; align-items:center; gap:10px; cursor:pointer;">
-            <input type="checkbox" id="hardcore-toggle" style="width:20px; height:20px; accent-color:var(--error); cursor:pointer;">
-            <span data-i18n="hardcore_label">🔥 Hardcore режим</span>
+        <label class="toggle-card">
+            <input type="checkbox" id="hardcore-toggle">
+            <span class="toggle-text" data-i18n="hardcore_label">🔥 Hardcore режим</span>
         </label>
     </div>
     <div class="input-group">
@@ -139,9 +526,9 @@
     </div>
     <button class="primary" onclick="startGame()" data-i18n="start_button">🚀 Започни игру</button>
 
-    <div style="margin-top: 20px; text-align: left;">
+    <div class="rating-block">
         <h3 data-i18n="rating_title">📊 Рекорди</h3>
-        <div id="rating-table" style="max-height: 150px; overflow-y: auto; background: #f8f9fa; padding: 10px; border-radius: 8px; font-size: 13px;">
+        <div id="rating-table">
             <div class="no-rating-text" data-i18n="no_ratings">Нема сачуваних рекорда</div>
         </div>
     </div>
@@ -154,15 +541,23 @@
     </div>
 
     <div id="ui-panel">
-        <div id="turn-info">
+        <div id="turn-info" aria-live="polite">
             <div><span id="turn-prefix" data-i18n="turn_prefix">На реду:</span> <span id="player-name">Играч 1</span></div>
             <div id="player-badge">P1</div>
         </div>
-        <div id="hardcore-badge" class="hidden" style="text-align:center; background: linear-gradient(135deg, #e17055, #d63031); color: white; padding: 6px 12px; border-radius: 8px; font-weight: bold; font-size: 14px; letter-spacing: 0.5px;">🔥 HARDCORE</div>
+        <div id="hardcore-badge" class="hidden">🔥 HARDCORE</div>
 
-        <button id="dice-btn" onclick="rollDice()" data-i18n="dice_button">🎲</button>
-        <div id="problem-box" data-i18n="dice_roll">Баци коцку...</div>
-        <div id="timer-bar"><div id="timer-fill"></div></div>
+        <div id="dice-wrap">
+            <svg id="timer-ring" viewBox="0 0 108 108" aria-hidden="true">
+                <circle class="ring-track" cx="54" cy="54" r="49"></circle>
+                <circle id="ring-fill" class="ring-fill" cx="54" cy="54" r="49" stroke-dasharray="307.9" stroke-dashoffset="0"></circle>
+            </svg>
+            <button id="dice-btn" onclick="rollDice()" aria-label="🎲">
+                <span class="face" aria-hidden="true"><i class="pip on"></i><i class="pip"></i><i class="pip on"></i><i class="pip"></i><i class="pip on"></i><i class="pip"></i><i class="pip on"></i><i class="pip"></i><i class="pip on"></i></span>
+            </button>
+        </div>
+        <div id="problem-box" aria-live="polite" data-i18n="dice_roll">Баци коцку...</div>
+        <div id="timer-label" aria-live="off"></div>
 
         <div id="keypad" class="hidden">
             <button class="kp-btn" onclick="typeNum(1)">1</button>
@@ -185,12 +580,16 @@
     </div>
 </div>
 
+<canvas id="confetti-canvas" class="hidden" aria-hidden="true"></canvas>
 <div id="win-overlay" class="hidden">
     <div id="win-box">
         <h1 data-i18n="win_title">🏆 Победа!</h1>
         <h2 id="winner-name"></h2>
         <p data-i18n="win_message">Честитамо! Сва острва су покорана!</p>
-        <button class="primary" onclick="restartGame()" data-i18n="restart_button">🔄 Играти поново</button>
+        <div class="win-btn-row">
+            <button class="primary" onclick="playAgain()" data-i18n="restart_button">🔄 Играти поново</button>
+            <button class="secondary" onclick="backToMenu()" data-i18n="menu_label">Мени</button>
+        </div>
     </div>
 </div>
 
@@ -207,8 +606,9 @@
     // === TRANSLATIONS (SR/EN/RU) ===
     const translations = {
         sr: {
-            title: "Математичко Авантура v2.2",
+            title: "Математичко Авантура v3.0",
             game_title: "🌊 Математичко Авантура",
+            tagline: "Трката на множењу — освој свих 10 острва!",
             players_label: "Број играча (2-4)",
             players_2: "2 играча",
             players_3: "3 играча",
@@ -218,6 +618,7 @@
             start_button: "🚀 Започни игру",
             rating_title: "📊 Рекорди",
             no_ratings: "Нема сачуваних рекорда",
+            accuracy: "Тачност", menu_label: "Мени", start_label: "СТАРТ",
             placman: "Пласман",
             player: "Играч",
             time: "Време",
@@ -268,8 +669,9 @@
             hardcore_label: "🔥 Hardcore режим"
         },
         en: {
-            title: "Math Adventure v2.2",
+            title: "Math Adventure v3.0",
             game_title: "🌊 Math Adventure",
+            tagline: "The multiplication race — conquer all 10 islands!",
             players_label: "Number of players (2-4)",
             players_2: "2 players",
             players_3: "3 players",
@@ -279,6 +681,7 @@
             start_button: "🚀 Start Game",
             rating_title: "📊 Ratings",
             no_ratings: "No saved records",
+            accuracy: "Accuracy", menu_label: "Menu", start_label: "START",
             placman: "Placement",
             player: "Player",
             time: "Time",
@@ -329,8 +732,9 @@
             hardcore_label: "🔥 Hardcore mode"
         },
         ru: {
-            title: "Математическое Приключение v2.2",
+            title: "Математическое Приключение v3.0",
             game_title: "🌊 Математическое Приключение",
+            tagline: "Гонка умножения — покори все 10 островов!",
             players_label: "Количество игроков (2-4)",
             players_2: "2 игрока",
             players_3: "3 игрока",
@@ -340,6 +744,7 @@
             start_button: "🚀 Начать игру",
             rating_title: "📊 Рекорды",
             no_ratings: "Нет сохраненных записей",
+            accuracy: "Точность", menu_label: "Меню", start_label: "СТАРТ",
             placman: "Место",
             player: "Игрок",
             time: "Время",
@@ -446,12 +851,7 @@
         // Update title
         document.title = t('title');
 
-        // Update select options
-        document.getElementById('num-players').innerHTML = `
-            <option value="2">${t('players_2')}</option>
-            <option value="3">${t('players_3')}</option>
-            <option value="4">${t('players_4')}</option>
-        `;
+        // Player count is now chip-based; nothing language-dependent to update.
     }
 
     // === STATE ===
@@ -460,7 +860,7 @@
         timerDuration: 15, timerLeft: 0, timerInterval: null,
         currentProblem: null, inputBuffer: "", isRolling: false, isAnswering: false, diceResult: 0,
         playerTime: [], totalStartTime: 0, playerTurns: [], difficulty: 3, boardSize: 30,
-        hardcore: false
+        hardcore: false, correctCount: 0, wrongCount: 0
     };
 
     // RATING TABLE
@@ -480,7 +880,7 @@
         saveRating(rating);
     }
 
-    const COLORS = ['#e17055', '#0984e3', '#00b894', '#6c5ce7'];
+    const COLORS = ['#ff7a59', '#38a8d8', '#12b886', '#b18cff'];
     const NAMES_SR = ['🦁 Играч 1', '🐯 Играч 2', '🦊 Играч 3', '🐼 Играч 4'];
     const NAMES_EN = ['🦁 Player 1', '🐯 Player 2', '🦊 Player 3', '🐼 Player 4'];
     const NAMES_RU = ['🦁 Игрок 1', '🐯 Игрок 2', '🦊 Игрок 3', '🐼 Игрок 4'];
@@ -493,17 +893,13 @@
 
     function rand(min, max) { return Math.floor(Math.random() * (max - min + 1)) + min; }
 
-    function startGame() {
-        // Force reset game state so leftover flags don't leak into a new game
-        clearInterval(state.timerInterval);
-        state.isAnswering = false;
-        state.isRolling = false;
-        document.getElementById('keypad').classList.add('hidden');
-        document.getElementById('dice-btn').disabled = false;
-        document.getElementById('dice-btn').textContent = '🎲';
-        document.getElementById('win-overlay').classList.add('hidden');
-        document.getElementById('history').innerHTML = '';
+    function setPlayerCount(n) {
+        document.getElementById('num-players').value = n;
+        document.querySelectorAll('.chip[data-players]').forEach(c =>
+            c.setAttribute('aria-pressed', String(parseInt(c.dataset.players) === n)));
+    }
 
+    function startGame() {
         renderRating();
         const num = parseInt(document.getElementById('num-players').value);
         const currentLang = getCurrentLang();
@@ -517,6 +913,7 @@
         state.extraTurn = new Array(num).fill(false);
         state.playerTime = new Array(num).fill(0);
         state.playerTurns = new Array(num).fill(0);
+        state.correctCount = 0; state.wrongCount = 0;
         state.totalStartTime = Date.now();
         state.currentPlayer = 0;
 
@@ -524,101 +921,159 @@
         document.querySelector('.lang-switch').classList.add('hidden');
 
         document.getElementById('setup-screen').style.display = 'none';
-        document.getElementById('game-screen').style.display = 'flex';
+        document.getElementById('game-screen').style.display = 'grid';
+        resetTurnUI();
         buildBoard(); createTokens(); updateUI();
         logSystem(`${t('game_started')}! ${t('good_luck')}`);
         showTurnPopup('🚀', `${state.players[0]}`, t('game_started'));
     }
 
     function buildBoard() {
+        const container = document.getElementById('board-container');
         const board = document.getElementById('board');
+        let pad = document.getElementById('start-pad');
+        if (!pad) {
+            pad = document.createElement('div');
+            pad.id = 'start-pad';
+            container.insertBefore(pad, board);
+        }
+        pad.innerHTML = `<span class="boat">⛵</span><span class="start-label" data-i18n="start_label">СТАРТ</span><div class="cell start-cell" id="cell-0"><span class="num">0</span></div>`;
+
         board.innerHTML = '';
-        // Dynamic board size based on difficulty: 10 fields per level
-        const totalCells = state.boardSize;
-        // Calculate grid dimensions: rows = ceil(size/10)
+        const totalCells = state.boardSize;          // 10 cells per island
         const rows = Math.ceil(totalCells / 10);
-        const cols = 10;
+        const ISLE_FLAGS = ['🥥', '🌋', '🌺', '🗿', '🦀', '⛵', '🐚', '🌴', '🔥', '👑'];
 
-        // Set grid dynamically for non-standard sizes
-        if (rows !== 10) {
-            board.style.gridTemplateColumns = `repeat(${cols}, 1fr)`;
-            board.style.gridTemplateRows = `repeat(${rows}, 1fr)`;
-            board.classList.add('dynamic-grid');
-        } else {
-            board.style.gridTemplateColumns = `repeat(${cols}, 1fr)`;
-            board.style.gridTemplateRows = `repeat(${rows}, 1fr)`;
-            board.classList.remove('dynamic-grid');
-        }
+        for (let r = 0; r < rows; r++) {
+            const isle = document.createElement('div');
+            isle.className = 'isle' + (r % 2 === 1 ? ' rev' : '');
+            isle.style.background = ISLAND_COLORS[Math.min(r, ISLAND_COLORS.length - 1)];
+            const flag = document.createElement('span');
+            flag.className = 'isle-flag';
+            flag.textContent = ISLE_FLAGS[r % ISLE_FLAGS.length];
+            isle.appendChild(flag);
 
-        for (let i = 0; i <= totalCells; i++) {
-            const cell = document.createElement('div');
-            cell.className = 'cell'; cell.id = `cell-${i}`;
-            const row = Math.floor(i / cols);
-            const isReversed = row % 2 !== 0;
-            const col = isReversed ? cols - 1 - (i % cols) : (i % cols);
-            cell.style.gridRow = rows - row; cell.style.gridColumn = col + 1;
-
-            let content = `<span class="num">${i}</span>`;
-            let islandIdx = -1;
-            if (i > 0 && i < totalCells) {
-                islandIdx = Math.min(Math.floor((i - 1) / 10), 9);
-                const offset = i % 10;
-                if (offset === 3) content += `<span class="cell-icon">🦜</span>`;
-                if (offset === 7) content += `<span class="cell-icon">🎁</span>`;
+            for (let i = r * 10 + 1; i <= Math.min((r + 1) * 10, totalCells); i++) {
+                const cell = document.createElement('div');
+                cell.className = 'cell';
+                cell.id = `cell-${i}`;
+                if (i === totalCells) {
+                    cell.classList.add('finish');
+                    cell.innerHTML = `🏆<span class="num">${i}</span>`;
+                } else {
+                    const offset = i % 10;
+                    if (offset === 3) {
+                        cell.classList.add('skip');
+                        cell.innerHTML = `<span class="cell-sym">⏳</span><span class="num">${i}</span>`;
+                    } else if (offset === 7) {
+                        cell.classList.add('gem');
+                        cell.innerHTML = `<span class="cell-sym">💎</span><span class="num">${i}</span>`;
+                    } else {
+                        cell.innerHTML = `<span class="num">${i}</span>`;
+                    }
+                }
+                isle.appendChild(cell);
             }
-            if (i === totalCells) cell.classList.add('finish');
-            cell.innerHTML = content;
-            if (islandIdx >= 0) {
-                const bg = document.createElement('div'); bg.className = 'island-bg'; bg.style.background = ISLAND_COLORS[islandIdx]; cell.appendChild(bg);
-            }
-            board.appendChild(cell);
+            board.appendChild(isle);
         }
+        translatePage();
     }
+
+    const ANIMALS = ['🦁', '🐯', '🦊', '🐼'];
+    // cluster patterns as fractions of token size; token auto-shrinks so the group fits one cell
+    const CLUSTER = {
+        2: [[-0.46, 0], [0.46, 0]],
+        3: [[-0.46, 0.34], [0.46, 0.34], [0, -0.48]],
+        4: [[-0.46, -0.46], [0.46, -0.46], [-0.46, 0.46], [0.46, 0.46]]
+    };
 
     function createTokens() {
         const container = document.getElementById('tokens-container'); container.innerHTML = '';
         state.players.forEach((_, i) => {
-            const t = document.createElement('div'); t.className = `token p${i}`; t.id = `token-${i}`; t.textContent = i + 1;
-            container.appendChild(t); moveTokenTo(i, 0);
+            const t = document.createElement('div'); t.className = `token p${i}`; t.id = `token-${i}`;
+            t.innerHTML = `<span class="token-body"><span class="token-animal">${ANIMALS[i % ANIMALS.length]}</span></span>`;
+            t.setAttribute('aria-label', state.players[i]);
+            container.appendChild(t); moveTokenTo(i, 0, false);
         });
     }
 
-    function moveTokenTo(playerIdx, targetPos) {
-        state.positions[playerIdx] = targetPos;
+    function positionToken(playerIdx) {
         const token = document.getElementById(`token-${playerIdx}`);
-        const cell = document.getElementById(`cell-${Math.min(targetPos, state.boardSize)}`);
-        if (cell) {
-            const rect = cell.getBoundingClientRect(); const boardRect = document.getElementById('board-container').getBoundingClientRect();
-            token.style.top = (rect.top - boardRect.top + rect.height / 2 - 14) + 'px';
-            token.style.left = (rect.left - boardRect.left + rect.width / 2 - 14) + 'px';
+        const pos = Math.min(state.positions[playerIdx], state.boardSize);
+        const cell = document.getElementById(`cell-${pos}`);
+        if (!token || !cell) return;
+        const rect = cell.getBoundingClientRect();
+        const boardRect = document.getElementById('board-container').getBoundingClientRect();
+        const peers = [];
+        state.players.forEach((_, i) => { if (Math.min(state.positions[i], state.boardSize) === pos) peers.push(i); });
+        const n = peers.length, my = peers.indexOf(playerIdx);
+        const cellW = rect.width || 40;
+        const scale = n === 1 ? 0.8 : n === 2 ? 0.5 : 0.46;
+        const size = Math.max(15, Math.min(32, cellW * scale));
+        token.style.width = size.toFixed(1) + 'px';
+        token.style.height = size.toFixed(1) + 'px';
+        token.style.fontSize = (size * 0.56).toFixed(1) + 'px';
+        let dx = 0, dy = 0;
+        if (n >= 2) { const pat = CLUSTER[Math.min(n, 4)][my % 4]; dx = pat[0] * size; dy = pat[1] * size; }
+        const x = rect.left - boardRect.left + rect.width / 2 - size / 2 + dx;
+        const y = rect.top - boardRect.top + rect.height / 2 - size / 2 + dy;
+        token.style.transform = `translate3d(${x.toFixed(1)}px, ${y.toFixed(1)}px, 0)`;
+        token.style.zIndex = state.currentPlayer === playerIdx ? 14 : 10 + my;
+    }
+
+    const tokenAnim = { timers: [], ms: 0 };
+    function moveTokenTo(playerIdx, targetPos, animate = true) {
+        tokenAnim.timers.forEach(clearTimeout); tokenAnim.timers = [];
+        const from = state.positions[playerIdx];
+        if (!animate || targetPos === from) {
+            state.positions[playerIdx] = targetPos;
+            state.players.forEach((_, i) => positionToken(i));
+            tokenAnim.ms = 0; return;
         }
+        const STEP = 170, dir = Math.sign(targetPos - from);
+        tokenAnim.ms = Math.abs(targetPos - from) * STEP;
+        let i = from;
+        const tick = () => {
+            i += dir;
+            state.positions[playerIdx] = i;
+            positionToken(playerIdx);
+            const token = document.getElementById(`token-${playerIdx}`);
+            if (token) { token.classList.remove('hop'); void token.offsetWidth; token.classList.add('hop'); }
+            if (i !== targetPos) tokenAnim.timers.push(setTimeout(tick, STEP));
+            else state.players.forEach((_, j) => positionToken(j));
+        };
+        tokenAnim.timers.push(setTimeout(tick, STEP));
+    }
+
+    window.addEventListener('resize', () => {
+        if (state.players && state.players.length) state.players.forEach((_, i) => positionToken(i));
+    });
+
+    const PIP_MAP = { 1: [4], 2: [0, 8], 3: [0, 4, 8], 4: [0, 2, 6, 8], 5: [0, 2, 4, 6, 8], 6: [0, 2, 3, 5, 6, 8] };
+    function setDiceFace(n) {
+        const pips = document.querySelectorAll('#dice-btn .pip');
+        const on = PIP_MAP[n] || PIP_MAP[1];
+        pips.forEach((p, idx) => p.classList.toggle('on', on.includes(idx)));
     }
 
     function rollDice() {
         if (state.isRolling || state.isAnswering) return;
 
         state.isRolling = true; const btn = document.getElementById('dice-btn');
-        btn.classList.add('rolling'); btn.disabled = true;
+        btn.classList.remove('tumble'); void btn.offsetWidth; btn.classList.add('tumble'); btn.disabled = true;
         document.getElementById('problem-box').textContent = t('dice_roll');
         document.getElementById('problem-box').className = '';
 
         setTimeout(() => {
             state.diceResult = Math.floor(Math.random() * 6) + 1;
-            btn.textContent = state.diceResult; btn.classList.remove('rolling'); state.isRolling = false;
+            btn.classList.remove('tumble'); setDiceFace(state.diceResult); state.isRolling = false;
             const target = Math.min(state.positions[state.currentPlayer] + state.diceResult, state.boardSize);
             document.getElementById('problem-box').textContent = `${t('dice_prefix')} ${state.diceResult} ➜ ${t('coordinate_prefix')} ${target}`;
             setTimeout(startAnswerPhase, 600);
         }, 600);
     }
 
-    function getIslandLevel(cell) {
-        if (cell <= 10) return 0; if (cell <= 20) return 1; if (cell <= 30) return 2;
-        if (cell <= 40) return 3; if (cell <= 50) return 4; if (cell <= 60) return 5;
-        if (cell <= 70) return 6; if (cell <= 80) return 7; if (cell <= 90) return 8;
-        return 9;
-    }
-
-    // Dynamic level calculation based on board size
+        // Dynamic level calculation based on board size
     function getIslandLevelDynamic(cell) {
         const levelSize = 10;
         const maxLevel = state.difficulty;
@@ -666,6 +1121,26 @@
         return Math.random() > 0.5 ? {q: `${a} × ${b} = ?`, ans: a*b} : {q: `${b} × ${a} = ?`, ans: a*b};
     }
 
+    function resetTurnUI() {
+        // Bring dice/keypad/problem box back to the "waiting for roll" state.
+        // The winning answer returns early from submitAnswer(), so without this
+        // the dice would stay disabled on the next game.
+        clearInterval(state.timerInterval);
+        state.isRolling = false;
+        state.isAnswering = false;
+        state.currentProblem = null;
+        state.inputBuffer = "";
+        const keypad = document.getElementById('keypad');
+        if (keypad) keypad.classList.add('hidden');
+        document.querySelectorAll('.kp-btn').forEach(b => b.disabled = false);
+        const dice = document.getElementById('dice-btn');
+        if (dice) { dice.disabled = false; dice.classList.remove('tumble'); }
+        const pb = document.getElementById('problem-box');
+        if (pb) { pb.className = ''; pb.textContent = t('dice_roll'); }
+        setDiceFace(1);
+        clearTimerLabel();
+    }
+
     function startAnswerPhase() {
         state.isAnswering = true;
         const target = Math.min(state.positions[state.currentPlayer] + state.diceResult, state.boardSize);
@@ -688,10 +1163,26 @@
         }, 1000);
     }
 
+    const RING_C = 307.9;
+    function clearTimerLabel() {
+        const label = document.getElementById('timer-label');
+        if (label) { label.textContent = ''; label.classList.remove('danger'); }
+        const ring = document.getElementById('ring-fill');
+        if (ring) { ring.classList.remove('warn', 'danger'); }
+    }
     function updateTimerBar() {
-        const pct = (state.timerLeft / state.timerDuration) * 100;
-        document.getElementById('timer-fill').style.width = pct + '%';
-        document.getElementById('timer-fill').style.background = state.timerLeft < 3 ? 'var(--error)' : 'var(--accent)';
+        const pct = state.timerLeft / state.timerDuration;
+        const ring = document.getElementById('ring-fill');
+        if (ring) {
+            ring.style.strokeDashoffset = (RING_C * (1 - pct)).toFixed(1);
+            ring.classList.toggle('warn', pct <= 0.5 && pct > 0.25);
+            ring.classList.toggle('danger', pct <= 0.25);
+        }
+        const label = document.getElementById('timer-label');
+        if (label) {
+            label.textContent = `⏱ ${state.timerLeft}s`;
+            label.classList.toggle('danger', state.timerLeft <= 3);
+        }
     }
 
     function typeNum(n) { if (state.isAnswering && state.inputBuffer.length < 3) { state.inputBuffer += n; showInput(); } }
@@ -729,17 +1220,55 @@
         }
     }
 
+    function spawnFloat(cellPos, text) {
+        const cell = document.getElementById(`cell-${Math.min(cellPos, state.boardSize)}`);
+        const container = document.getElementById('tokens-container');
+        if (!cell || !container) return;
+        const rect = cell.getBoundingClientRect();
+        const bRect = document.getElementById('board-container').getBoundingClientRect();
+        const el = document.createElement('div');
+        el.className = 'float-plus'; el.textContent = text;
+        el.style.left = (rect.left - bRect.left + rect.width / 2 - 14) + 'px';
+        el.style.top = (rect.top - bRect.top + rect.height / 2 - 12) + 'px';
+        container.appendChild(el);
+        // keep it mounted for the full 1.8s of the CSS animation
+        setTimeout(() => el.remove(), 1850);
+    }
+
+    function launchConfetti(duration = 2800) {
+        if (window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+        const canvas = document.getElementById('confetti-canvas');
+        if (!canvas) return;
+        canvas.classList.remove('hidden');
+        const ctx = canvas.getContext('2d');
+        canvas.width = innerWidth; canvas.height = innerHeight;
+        const colors = ['#ff7a59', '#ffd166', '#4cc9f0', '#12b886', '#b18cff', '#ff7a9c'];
+        const parts = Array.from({ length: 150 }, () => ({
+            x: Math.random() * canvas.width, y: -20 - Math.random() * canvas.height * 0.6,
+            w: 6 + Math.random() * 6, h: 8 + Math.random() * 8,
+            c: colors[Math.floor(Math.random() * colors.length)],
+            vy: 2 + Math.random() * 3.4, vx: -1 + Math.random() * 2,
+            rot: Math.random() * Math.PI, vr: -0.1 + Math.random() * 0.2
+        }));
+        const t0 = performance.now();
+        (function frame(now) {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            parts.forEach(p => {
+                p.x += p.vx; p.y += p.vy; p.rot += p.vr;
+                ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(p.rot);
+                ctx.fillStyle = p.c; ctx.fillRect(-p.w / 2, -p.h / 2, p.w, p.h); ctx.restore();
+            });
+            if (now - t0 < duration) requestAnimationFrame(frame);
+            else { ctx.clearRect(0, 0, canvas.width, canvas.height); canvas.classList.add('hidden'); }
+        })(t0);
+    }
+
     function submitAnswer(timeout = false) {
         if (!state.isAnswering) return;
         const answerTime = state.timerDuration - state.timerLeft;
         state.playerTime[state.currentPlayer] += answerTime;
         clearInterval(state.timerInterval); state.isAnswering = false;
         document.querySelectorAll('.kp-btn').forEach(b => b.disabled = true);
-
-        // Reset UI before branching so it always runs (even on win)
-        document.getElementById('keypad').classList.add('hidden');
-        document.getElementById('dice-btn').disabled = false;
-        document.getElementById('dice-btn').textContent = '🎲';
 
         const userAns = parseInt(state.inputBuffer);
         const correct = state.currentProblem.ans;
@@ -748,36 +1277,45 @@
         const target = Math.min(startPos + state.diceResult, state.boardSize);
         const pName = state.players[state.currentPlayer];
 
-        const histText = `${pName} 📍${startPos} + 🎲${state.diceResult} ➜ ${state.currentProblem.q.replace('= ?','')} → ${timeout?'⏱':userAns} ${isCorrect?'✅':'❌'}`;
+        const targetShown = Math.min(startPos + state.diceResult, state.boardSize);
+        const histHtml = `<span class="log-dot" style="background:${COLORS[state.currentPlayer]}"></span><span>🎲${state.diceResult} · ${startPos}→${targetShown}</span><span class="log-answer">${timeout ? '⏱' : (isNaN(userAns) ? '—' : userAns)} ${isCorrect ? '✅' : '❌'}</span>`;
 
         if (isCorrect) {
             document.getElementById('problem-box').className = 'correct';
             document.getElementById('problem-box').textContent = t('correct');
-            logHistory(histText, 'correct');
+            logHistoryHtml(histHtml);
+            state.correctCount++;
             moveTokenTo(state.currentPlayer, target);
+            const landed = '+' + (target - startPos);
+            setTimeout(() => spawnFloat(target, landed), tokenAnim.ms);
             checkBonuses(target);
 
             // Increment turn count for this player (on successful answer)
             state.playerTurns[state.currentPlayer]++;
 
-            if (target >= state.boardSize) { setTimeout(checkWin, 600); return; }
+            if (target >= state.boardSize) { setTimeout(checkWin, Math.max(600, tokenAnim.ms + 400)); return; }
             if (state.extraTurn[state.currentPlayer]) {
                 state.extraTurn[state.currentPlayer] = false;
                 logBonus(`${t('bonus_token')} ${pName}!`);
                 setTimeout(endTurnPhase, 800);
             } else { setTimeout(nextTurn, 1000); }
         } else {
-            document.getElementById('problem-box').className = 'wrong';
+            { const pb = document.getElementById('problem-box'); pb.className = 'wrong'; void pb.offsetWidth; pb.className = 'wrong shake'; }
             document.getElementById('problem-box').textContent = timeout ? `${t('time_out')} ${t('correct_answer_prefix')} ${correct}` : `❌ ${t('correct_answer_prefix')} ${correct}`;
-            logHistory(histText, 'wrong');
+            logHistoryHtml(histHtml, 'wrong');
+            state.wrongCount++;
             setTimeout(nextTurn, 1500);
         }
+
+        document.getElementById('keypad').classList.add('hidden');
+        document.getElementById('dice-btn').disabled = false;
+        setDiceFace(1); clearTimerLabel();
     }
 
     function checkBonuses(cell) {
         const offset = cell % 10;
-        if (offset === 3) { state.skipNext[state.currentPlayer] = true; logBonus(`🦜 ${state.players[state.currentPlayer]} ${t('skip_token')}`); }
-        if (offset === 7) { state.extraTurn[state.currentPlayer] = true; logBonus(`🎁 ${state.players[state.currentPlayer]} ${t('bonus_extra_turn')}`); }
+        if (offset === 3) { state.skipNext[state.currentPlayer] = true; logBonus(`⏳ ${state.players[state.currentPlayer]} ${t('skip_token')}`); }
+        if (offset === 7) { state.extraTurn[state.currentPlayer] = true; logBonus(`💎 ${state.players[state.currentPlayer]} ${t('bonus_extra_turn')}`); }
     }
 
     function nextTurn() {
@@ -788,12 +1326,12 @@
         // If the next player must skip their turn - skip immediately
         if (state.skipNext[state.currentPlayer]) {
             state.skipNext[state.currentPlayer] = false;
-            logSystem(`🦜 ${state.players[state.currentPlayer]} ${t('skip_turn')}`);
-            showTurnPopup('🦜', `${state.players[state.currentPlayer]}`, t('skip_turn'));
+            logSystem(`⏳ ${state.players[state.currentPlayer]} ${t('skip_turn')}`);
+            showTurnPopup('⏳', `${state.players[state.currentPlayer]}`, t('skip_turn'));
             setTimeout(nextTurn, 1500);
         }
     }
-    function endTurnPhase() { document.getElementById('keypad').classList.add('hidden'); document.getElementById('dice-btn').disabled = false; document.getElementById('dice-btn').textContent = '🎲'; updateUI(); showTurnPopup('🔄', `${state.players[state.currentPlayer]}`, t('turn_prefix')); }
+    function endTurnPhase() { document.getElementById('keypad').classList.add('hidden'); document.getElementById('dice-btn').disabled = false; setDiceFace(1); clearTimerLabel(); updateUI(); showTurnPopup('🔄', `${state.players[state.currentPlayer]}`, t('turn_prefix')); }
 
     function updateUI() {
         const pIdx = state.currentPlayer;
@@ -821,18 +1359,16 @@
         const rating = loadRating();
         const box = document.getElementById('rating-table');
         if (rating.length === 0) {
-            box.innerHTML = '<div class="no-rating-text" data-i18n="no_ratings" style="color:#999; text-align:center; padding:10px;">Нема сачуваних рекорда</div>';
+            box.innerHTML = `<div class="no-rating-text">${t('no_ratings')}</div>`;
             return;
         }
-        let html = '<table style="width:100%; border-collapse:collapse;"><thead><tr><th style="text-align:left; padding:5px; border-bottom:2px solid #ddd;">' + t('placman') + '</th><th style="text-align:left; padding:5px; border-bottom:2px solid #ddd;">' + t('player') + '</th><th style="text-align:center; padding:5px; border-bottom:2px solid #ddd;">' + t('difficulty') + '</th><th style="text-align:right; padding:5px; border-bottom:2px solid #ddd;">' + t('time') + '</th><th style="text-align:center; padding:5px; border-bottom:2px solid #ddd;">' + t('moves') + '</th><th style="text-align:center; padding:5px; border-bottom:2px solid #ddd;">' + t('players') + '</th></tr></thead><tbody>';
+        let html = `<table><thead><tr><th>${t('placman')}</th><th>${t('player')}</th><th>${t('difficulty')}</th><th>${t('time')}</th><th>${t('moves')}</th><th>${t('players')}</th></tr></thead><tbody>`;
         rating.slice(0, 10).forEach((entry, i) => {
             const place = ['🥇', '🥈', '🥉'][i] || (i + 1);
-            // Display difficulty as ×N format
             let diff = entry.difficulty ? '×' + entry.difficulty : '×3';
-            if (entry.hardcore) diff += ' <span style="color:#d63031;font-weight:bold;">H</span>';
-            // Calculate total moves from playerTurns array if available
+            if (entry.hardcore) diff += ' <span class="badge-hardcore">H</span>';
             const moves = entry.turns ? entry.turns.reduce((a, b) => a + b, 0) : '-';
-            html += `<tr style="border-bottom:1px solid #eee;"><td style="padding:5px;">${place}</td><td style="padding:5px;">${entry.name}</td><td style="text-align:center; padding:5px;">${diff}</td><td style="text-align:right; padding:5px;">${entry.time}s</td><td style="text-align:center; padding:5px;">${moves}</td><td style="text-align:center; padding:5px;">${entry.players}</td></tr>`;
+            html += `<tr><td class="medal">${place}</td><td>${entry.name}</td><td>${diff}</td><td>${entry.time}s</td><td>${moves}</td><td>${entry.players}</td></tr>`;
         });
         html += '</tbody></table>';
         box.innerHTML = html;
@@ -841,24 +1377,31 @@
     function checkWin() {
         const totalTime = state.playerTime.reduce((a, b) => a + b, 0);
         const winnerName = state.players[state.currentPlayer];
-        document.getElementById('winner-name').textContent = winnerName;
-
-        // Show name input
-        const inputHtml = `
-            <p style="margin: 15px 0; font-size: 16px;">${t('time_total')} <strong>${totalTime} ${t('time_seconds')}</strong></p>
-            <div class="input-group" style="margin-bottom: 10px;">
-                <input type="text" id="winner-name-input" placeholder="${t('winner_name_placeholder')}" style="width: 100%; padding: 10px; border: 2px solid #ddd; border-radius: 8px; font-size: 16px;">
-            </div>
-            <button class="primary" onclick="saveAndShowRating()" data-i18n="save_rating"></button>
-            <button class="primary" style="margin-top: 8px; background: #95a5a6;" onclick="restartGame()" data-i18n="restart_button"></button>
-        `;
+        const moves = state.playerTurns.reduce((a, b) => a + b, 0);
+        const answered = state.correctCount + state.wrongCount;
+        const acc = answered ? Math.round(100 * state.correctCount / answered) : 100;
+        const stars = acc >= 80 ? '⭐⭐⭐' : acc >= 55 ? '⭐⭐' : '⭐';
+        launchConfetti();
         document.getElementById('win-box').innerHTML = `
             <h1 data-i18n="win_title"></h1>
-            <h2>${winnerName}</h2>
+            <div class="stars" aria-hidden="true">${stars}</div>
+            <h2>🥇 ${winnerName}</h2>
             <p>${t('islands_conquered')}</p>
-            ${inputHtml}
+            <div class="stats-grid">
+                <div class="stat"><div class="v">${totalTime}s</div><div class="k">${t('total_time').replace(':','')}</div></div>
+                <div class="stat"><div class="v">${moves}</div><div class="k">${t('moves')}</div></div>
+                <div class="stat"><div class="v">${acc}%</div><div class="k">${t('accuracy')}</div></div>
+            </div>
+            <div class="input-group">
+                <input type="text" class="name-input" id="winner-name-input" placeholder="${t('winner_name_placeholder')}">
+            </div>
+            <button class="primary" onclick="saveAndShowRating()" data-i18n="save_rating"></button>
+            <div class="win-btn-row">
+                <button class="primary" onclick="playAgain()" data-i18n="restart_button"></button>
+                <button class="secondary" onclick="backToMenu()" data-i18n="menu_label"></button>
+            </div>
         `;
-        translatePage(); // Apply translations to dynamically injected HTML
+        translatePage();
         document.getElementById('win-overlay').classList.remove('hidden');
         document.getElementById('winner-name-input').focus();
     }
@@ -868,6 +1411,7 @@
         const totalTime = state.playerTime.reduce((a, b) => a + b, 0);
         addRatingEntry(name, totalTime, state.players.length);
         document.getElementById('win-overlay').classList.add('hidden');
+        resetTurnUI();
         renderRating();
         document.getElementById('setup-screen').style.display = 'block';
         document.getElementById('game-screen').style.display = 'none';
@@ -875,13 +1419,16 @@
         document.querySelector('.lang-switch').classList.remove('hidden');
     }
 
-    function restartGame() {
-        clearInterval(state.timerInterval);
-        state.players = [];
-        state.positions = [];
-        state.currentPlayer = 0;
-
+    function playAgain() {
         document.getElementById('win-overlay').classList.add('hidden');
+        document.getElementById('history').innerHTML = '';
+        resetTurnUI();
+        startGame();
+    }
+
+    function backToMenu() {
+        document.getElementById('win-overlay').classList.add('hidden');
+        resetTurnUI();
         document.getElementById('game-screen').style.display = 'none';
         document.getElementById('setup-screen').style.display = 'block';
         document.querySelector('.lang-switch').classList.remove('hidden');
@@ -894,6 +1441,14 @@
         const entry = document.createElement('div');
         entry.className = `log-entry ${type === 'wrong' ? 'wrong' : type === 'bonus' ? 'bonus' : ''}`;
         entry.textContent = text; box.appendChild(entry); box.scrollTop = box.scrollHeight;
+    }
+    function logHistoryHtml(html, cls) {
+        const box = document.getElementById('history');
+        if (box.children[0]?.classList.contains('system')) box.innerHTML = '';
+        const entry = document.createElement('div');
+        entry.className = `log-entry ${cls || ''}`;
+        entry.innerHTML = html;
+        box.appendChild(entry); box.scrollTop = box.scrollHeight;
     }
     function logBonus(text) { logHistory(text, 'bonus'); }
     function logSystem(text) {
@@ -910,6 +1465,7 @@
         translatePage();
         renderRating();
         updateDifficultyLabel(); // Initialize difficulty label on load
+        setDiceFace(1); clearTimerLabel();
         document.addEventListener('keydown', handleKeyboardInput);
     });
 </script>
