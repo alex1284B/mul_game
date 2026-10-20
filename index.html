@@ -333,6 +333,11 @@
             border-radius: var(--r-sm); font-weight: 900; font-size: 13px; letter-spacing: .1em;
             box-shadow: 0 6px 16px rgba(232, 72, 63, .3);
         }
+        #mode-badge {
+            text-align: center; background: linear-gradient(135deg, var(--accent), var(--accent-dark)); color: #fff; padding: 8px 12px;
+            border-radius: var(--r-sm); font-weight: 900; font-size: 13px; letter-spacing: .1em;
+            box-shadow: 0 6px 16px rgba(15, 155, 208, .3);
+        }
 
         /* dice + timer ring */
         #dice-wrap { position: relative; width: 108px; height: 108px; margin: 2px auto; }
@@ -506,6 +511,14 @@
         </div>
         <input type="hidden" id="num-players" value="2">
     </div>
+    <div class="input-group">
+        <label data-i18n="mode_label">Операција</label>
+        <div class="chip-row" role="group" aria-label="operation">
+            <button type="button" class="chip" data-mode="mul" aria-pressed="true" onclick="setGameMode('mul')"><span class="chip-avatars">✖️</span><span class="chip-num" data-i18n="mode_mul">Множење</span></button>
+            <button type="button" class="chip" data-mode="div" aria-pressed="false" onclick="setGameMode('div')"><span class="chip-avatars">➗</span><span class="chip-num" data-i18n="mode_div">Дељење</span></button>
+        </div>
+        <input type="hidden" id="game-mode" value="mul">
+    </div>
     <div class="input-group difficulty-wrapper">
         <div class="difficulty-slider-container">
             <label data-i18n="difficulty_label">Ниво сложености</label>
@@ -546,6 +559,7 @@
             <div id="player-badge">P1</div>
         </div>
         <div id="hardcore-badge" class="hidden">🔥 HARDCORE</div>
+        <div id="mode-badge" class="hidden"></div>
 
         <div id="dice-wrap">
             <svg id="timer-ring" viewBox="0 0 108 108" aria-hidden="true">
@@ -666,7 +680,11 @@
             good_luck: "Срећно",
             moves: "Ходова",
             difficulty: "Сложеност",
-            hardcore_label: "🔥 Hardcore режим"
+            hardcore_label: "🔥 Hardcore режим",
+            mode_label: "Операција",
+            mode_mul: "Множење",
+            mode_div: "Дељење",
+            remainder_word: "остатак"
         },
         en: {
             title: "Math Adventure v3.0",
@@ -729,7 +747,11 @@
             good_luck: "Good luck",
             moves: "moves",
             difficulty: "Difficulty",
-            hardcore_label: "🔥 Hardcore mode"
+            hardcore_label: "🔥 Hardcore mode",
+            mode_label: "Operation",
+            mode_mul: "Multiplication",
+            mode_div: "Division",
+            remainder_word: "remainder"
         },
         ru: {
             title: "Математическое Приключение v3.0",
@@ -792,7 +814,11 @@
             good_luck: "Удачи",
             moves: "ходов",
             difficulty: "Сложность",
-            hardcore_label: "🔥 Hardcore режим"
+            hardcore_label: "🔥 Hardcore режим",
+            mode_label: "Операция",
+            mode_mul: "Умножение",
+            mode_div: "Деление",
+            remainder_word: "остаток"
         }
     };
 
@@ -860,7 +886,7 @@
         timerDuration: 15, timerLeft: 0, timerInterval: null,
         currentProblem: null, inputBuffer: "", isRolling: false, isAnswering: false, diceResult: 0,
         playerTime: [], totalStartTime: 0, playerTurns: [], difficulty: 3, boardSize: 30,
-        hardcore: false, correctCount: 0, wrongCount: 0
+        hardcore: false, correctCount: 0, wrongCount: 0, mode: 'mul'
     };
 
     // RATING TABLE
@@ -874,7 +900,7 @@
     }
     function addRatingEntry(name, time, players) {
         const rating = loadRating();
-        rating.push({ name, time, players, difficulty: state.difficulty, turns: state.playerTurns, hardcore: state.hardcore, date: new Date().toISOString() });
+        rating.push({ name, time, players, difficulty: state.difficulty, turns: state.playerTurns, hardcore: state.hardcore, mode: state.mode, date: new Date().toISOString() });
         rating.sort((a, b) => a.time - b.time);
         if (rating.length > 50) rating.length = 50;
         saveRating(rating);
@@ -899,6 +925,12 @@
             c.setAttribute('aria-pressed', String(parseInt(c.dataset.players) === n)));
     }
 
+    function setGameMode(m) {
+        document.getElementById('game-mode').value = m;
+        document.querySelectorAll('.chip[data-mode]').forEach(c =>
+            c.setAttribute('aria-pressed', String(c.dataset.mode === m)));
+    }
+
     function startGame() {
         renderRating();
         const num = parseInt(document.getElementById('num-players').value);
@@ -907,6 +939,7 @@
         state.boardSize = state.difficulty * 10; // Dynamic board size
         state.timerDuration = parseInt(document.getElementById('time-limit').value) || 15;
         state.hardcore = document.getElementById('hardcore-toggle').checked;
+        state.mode = document.getElementById('game-mode').value === 'div' ? 'div' : 'mul';
         state.players = Array.from({length: num}, (_, i) => NAMES[currentLang][i]);
         state.positions = new Array(num).fill(0);
         state.skipNext = new Array(num).fill(false);
@@ -1086,6 +1119,12 @@
 
     function generateProblem(cell) {
         const level = getIslandLevelDynamic(cell);
+        // Division drills the inverse of the same island table, so both modes share one progression.
+        if (state.mode === 'div') return generateDivisionProblem(level);
+        return generateMultiplicationProblem(level);
+    }
+
+    function generateMultiplicationProblem(level) {
         let a, b;
         switch(level) {
             case 0: { // ×0, ×1, ×10 → ×10, ×11, ×20 in hardcore
@@ -1118,6 +1157,47 @@
         }
         if (state.hardcore) a += 10;
         return Math.random() > 0.5 ? {q: `${a} × ${b} = ?`, ans: a*b} : {q: `${b} × ${a} = ?`, ans: a*b};
+    }
+
+    // Island N divides by N+1, the inverse of the ×(N+1) table the same island drills in
+    // multiplication mode, so one difficulty slider drives both.
+    function generateDivisionProblem(level) {
+        let d, q;
+        switch(level) {
+            case 0: {
+                // Opening island is exact-only: ×0 has no inverse, and a divisor of 1 can
+                // never leave a remainder, so a remainder form here would be unanswerable.
+                const roll = Math.random();
+                const num = rand(1, 9);
+                if (state.hardcore) {
+                    if (roll < 0.33) return {q: `${num * 10} ÷ 10 = ?`, ans: num};
+                    if (roll < 0.66) return {q: `${num * 11} ÷ 11 = ?`, ans: num};
+                    return {q: `${num * 20} ÷ 20 = ?`, ans: num};
+                }
+                if (roll < 0.5) return {q: `${num} ÷ 1 = ?`, ans: num};
+                return {q: `${num * 10} ÷ 10 = ?`, ans: num};
+            }
+            case 1: d = 2; q = rand(2, 9); break;
+            case 2: d = 3; q = rand(3, 9); break;
+            case 3: d = Math.random() > 0.5 ? 4 : 5; q = rand(3, 9); break;
+            case 4: d = 6; q = rand(4, 9); break;
+            case 5: d = 7; q = rand(4, 9); break;
+            case 6: d = 8; q = rand(5, 9); break;
+            case 7: d = 9; q = rand(5, 9); break;
+            case 8: d = rand(3, 7); q = rand(3, 7); break;
+            case 9: // Hard/Reverse
+                d = rand(4, 9); q = rand(4, 9);
+                if (state.hardcore) d += 10;
+                if (Math.random() > 0.5) return {q: `? ÷ ${d} = ${q}`, ans: d * q};
+                return {q: `${d * q} ÷ ${q} = ?`, ans: d};
+        }
+        if (state.hardcore) d += 10;
+        const product = d * q;
+        // Ask for the quotient, or give the quotient and ask for the remainder. Either way
+        // the answer is one number, so the keypad, input cap and grading stay mode-agnostic.
+        if (Math.random() < 0.5) return {q: `${product} ÷ ${d} = ?`, ans: q};
+        const r = rand(1, d - 1); // a remainder is always strictly between 0 and the divisor
+        return {q: `${product + r} ÷ ${d} = ${q} ${t('remainder_word')} ?`, ans: r};
     }
 
     function resetTurnUI() {
@@ -1341,6 +1421,14 @@
 
         // Show/hide hardcore badge
         document.getElementById('hardcore-badge').classList.toggle('hidden', !state.hardcore);
+
+        // Show which operation this game is drilling; multiplication is the default
+        // setting, so its badge would be noise and only division is announced.
+        const modeBadge = document.getElementById('mode-badge');
+        if (modeBadge) {
+            modeBadge.classList.toggle('hidden', state.mode !== 'div');
+            modeBadge.textContent = `➗ ${t('mode_div')}`;
+        }
     }
 
     function showTurnPopup(icon, text, sub) {
@@ -1363,7 +1451,9 @@
         let html = `<table><thead><tr><th>${t('placman')}</th><th>${t('player')}</th><th>${t('difficulty')}</th><th>${t('time')}</th><th>${t('moves')}</th><th>${t('players')}</th></tr></thead><tbody>`;
         rating.slice(0, 10).forEach((entry, i) => {
             const place = ['🥇', '🥈', '🥉'][i] || (i + 1);
-            let diff = entry.difficulty ? '×' + entry.difficulty : '×3';
+            // Entries saved before the mode switch predate division, so absent mode is multiplication.
+            const mode = entry.mode === 'div' ? 'div' : 'mul';
+            let diff = `${mode === 'div' ? '➗' : '✖️'} ${entry.difficulty ? entry.difficulty : '3'}`;
             if (entry.hardcore) diff += ' <span class="badge-hardcore">H</span>';
             const moves = entry.turns ? entry.turns.reduce((a, b) => a + b, 0) : '-';
             html += `<tr><td class="medal">${place}</td><td>${entry.name}</td><td>${diff}</td><td>${entry.time}s</td><td>${moves}</td><td>${entry.players}</td></tr>`;
