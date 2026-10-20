@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title data-i18n="title">Математичко Авантура v2.2</title>
+    <title data-i18n="title">Математичко Авантура v3.0</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Comfortaa:wght@500;700&family=Nunito:wght@600;700;800;900&display=swap" rel="stylesheet">
@@ -889,7 +889,7 @@
         en: NAMES_EN,
         ru: NAMES_RU
     };
-    const ISLAND_COLORS = ['var(--island-0)', 'var(--island-1)', 'var(--island-2)', 'var(--island-3)', 'var(--island-4)', 'var(--island-5)', 'var(--island-6)', 'var(--island-7)', 'var(--island-8)', 'var(--island-9)'];
+    const ISLAND_COLORS = ['var(--isle-0)', 'var(--isle-1)', 'var(--isle-2)', 'var(--isle-3)', 'var(--isle-4)', 'var(--isle-5)', 'var(--isle-6)', 'var(--isle-7)', 'var(--isle-8)', 'var(--isle-9)'];
 
     function rand(min, max) { return Math.floor(Math.random() * (max - min + 1)) + min; }
 
@@ -1084,7 +1084,6 @@
         return Math.min(Math.floor((cell - 1) / levelSize), maxLevel - 1);
     }
 
-    // 🔧 ИСПРАВЛЕННЫЙ БЛОК ГЕНЕРАЦИИ
     function generateProblem(cell) {
         const level = getIslandLevelDynamic(cell);
         let a, b;
@@ -1277,8 +1276,7 @@
         const target = Math.min(startPos + state.diceResult, state.boardSize);
         const pName = state.players[state.currentPlayer];
 
-        const targetShown = Math.min(startPos + state.diceResult, state.boardSize);
-        const histHtml = `<span class="log-dot" style="background:${COLORS[state.currentPlayer]}"></span><span>🎲${state.diceResult} · ${startPos}→${targetShown}</span><span class="log-answer">${timeout ? '⏱' : (isNaN(userAns) ? '—' : userAns)} ${isCorrect ? '✅' : '❌'}</span>`;
+        const histHtml = `<span class="log-dot" style="background:${COLORS[state.currentPlayer]}"></span><span>🎲${state.diceResult} · ${startPos}→${target}</span><span class="log-answer">${timeout ? '⏱' : (isNaN(userAns) ? '—' : userAns)} ${isCorrect ? '✅' : '❌'}</span>`;
 
         if (isCorrect) {
             document.getElementById('problem-box').className = 'correct';
