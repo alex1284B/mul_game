@@ -540,7 +540,7 @@
     <button class="primary" onclick="startGame()" data-i18n="start_button">🚀 Започни игру</button>
 
     <div class="rating-block">
-        <h3 data-i18n="rating_title">📊 Рекорди</h3>
+        <h3><span data-i18n="rating_title">📊 Рекорди</span> <span id="rating-mode">✖️</span></h3>
         <div id="rating-table">
             <div class="no-rating-text" data-i18n="no_ratings">Нема сачуваних рекорда</div>
         </div>
@@ -890,20 +890,31 @@
     };
 
     // RATING TABLE
-    const RATING_KEY = 'math_game_rating_v2';
-    function loadRating() {
-        try { return JSON.parse(localStorage.getItem(RATING_KEY)) || []; }
+    // Each operation keeps its own table, so a division record can never outrank a multiplication one.
+    const RATING_KEYS = { mul: 'math_game_rating_v2', div: 'math_game_rating_div_v2' };
+    function loadRating(mode) {
+        try { return JSON.parse(localStorage.getItem(RATING_KEYS[mode])) || []; }
         catch(e) { return []; }
     }
-    function saveRating(rating) {
-        localStorage.setItem(RATING_KEY, JSON.stringify(rating));
+    function saveRating(rating, mode) {
+        localStorage.setItem(RATING_KEYS[mode], JSON.stringify(rating));
     }
     function addRatingEntry(name, time, players) {
-        const rating = loadRating();
-        rating.push({ name, time, players, difficulty: state.difficulty, turns: state.playerTurns, hardcore: state.hardcore, mode: state.mode, date: new Date().toISOString() });
+        const rating = loadRating(state.mode);
+        rating.push({ name, time, players, difficulty: state.difficulty, turns: state.playerTurns, hardcore: state.hardcore, date: new Date().toISOString() });
         rating.sort((a, b) => a.time - b.time);
         if (rating.length > 50) rating.length = 50;
-        saveRating(rating);
+        saveRating(rating, state.mode);
+    }
+    function migrateLegacyDivRatings() {
+        const mulRating = loadRating('mul');
+        const legacyDiv = mulRating.filter(e => e.mode === 'div');
+        if (legacyDiv.length === 0) return;
+        saveRating(mulRating.filter(e => e.mode !== 'div'), 'mul');
+        const divRating = loadRating('div').concat(legacyDiv);
+        divRating.sort((a, b) => a.time - b.time);
+        if (divRating.length > 50) divRating.length = 50;
+        saveRating(divRating, 'div');
     }
 
     const COLORS = ['#ff7a59', '#38a8d8', '#12b886', '#b18cff'];
@@ -929,6 +940,9 @@
         document.getElementById('game-mode').value = m;
         document.querySelectorAll('.chip[data-mode]').forEach(c =>
             c.setAttribute('aria-pressed', String(c.dataset.mode === m)));
+        // Keep state in sync so the records table below switches to the picked operation.
+        state.mode = m;
+        renderRating();
     }
 
     function startGame() {
@@ -1274,6 +1288,13 @@
             return;
         }
 
+        // Space rolls the dice, so keys belong to the game only while the board is on
+        // screen. A roll from the setup screen runs against empty state: it leaves
+        // isAnswering set and the dice disabled, so the next Start looks dead.
+        if (getComputedStyle(document.getElementById('game-screen')).display === 'none') {
+            return;
+        }
+
         const isSpaceKey = event.key === ' ' || event.code === 'Space';
         if (!state.isAnswering) {
             if (isSpaceKey && !state.isRolling) {
@@ -1442,7 +1463,11 @@
     }
 
     function renderRating() {
-        const rating = loadRating();
+        // Setup screen shows only the table of the operation currently selected.
+        const mode = state.mode;
+        const modeLabel = document.getElementById('rating-mode');
+        if (modeLabel) modeLabel.textContent = mode === 'div' ? '➗' : '✖️';
+        const rating = loadRating(mode);
         const box = document.getElementById('rating-table');
         if (rating.length === 0) {
             box.innerHTML = `<div class="no-rating-text">${t('no_ratings')}</div>`;
@@ -1451,9 +1476,7 @@
         let html = `<table><thead><tr><th>${t('placman')}</th><th>${t('player')}</th><th>${t('difficulty')}</th><th>${t('time')}</th><th>${t('moves')}</th><th>${t('players')}</th></tr></thead><tbody>`;
         rating.slice(0, 10).forEach((entry, i) => {
             const place = ['🥇', '🥈', '🥉'][i] || (i + 1);
-            // Entries saved before the mode switch predate division, so absent mode is multiplication.
-            const mode = entry.mode === 'div' ? 'div' : 'mul';
-            let diff = `${mode === 'div' ? '➗' : '✖️'} ${entry.difficulty ? entry.difficulty : '3'}`;
+            let diff = `${entry.difficulty ? entry.difficulty : '3'}`;
             if (entry.hardcore) diff += ' <span class="badge-hardcore">H</span>';
             const moves = entry.turns ? entry.turns.reduce((a, b) => a + b, 0) : '-';
             html += `<tr><td class="medal">${place}</td><td>${entry.name}</td><td>${diff}</td><td>${entry.time}s</td><td>${moves}</td><td>${entry.players}</td></tr>`;
@@ -1551,6 +1574,7 @@
         document.getElementById('lang-select').value = savedLang;
         document.documentElement.lang = savedLang;
         translatePage();
+        migrateLegacyDivRatings();
         renderRating();
         updateDifficultyLabel(); // Initialize difficulty label on load
         setDiceFace(1); clearTimerLabel();
